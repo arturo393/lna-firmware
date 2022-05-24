@@ -21,8 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <string.h>
-#include <stdio.h>
+//#include <string.h>
+//#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,6 +50,8 @@ UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
+
+#define LN10 2.3025850929940456840179914546844
 
 #define MINIMUN_FRAME_SIZE 7
 #define LNA_MODULE_ADDR 0x00
@@ -213,7 +215,6 @@ void create_lna_frame(uint8_t *frame, struct Lna lna) {
 	frame[11] = crc_frame[0];
 	frame[12] = crc_frame[1];
 	frame[13] = END_MARK;
-
 }
 
 void uart_send_frame(uint8_t *frame, uint8_t len) {
@@ -257,12 +258,50 @@ uint8_t get_valid_start_index(uint8_t UART1_rxBuffer[20]) {
 }
 
 void init_lna_value() {
-	uint lna_attenuation = 0;
+	uint8_t lna_attenuation = 0;
 	lna_attenuation = EEPROM_Read(LNA_ATT_ADDR);
 	if (lna_attenuation < 0 || lna_attenuation > 31) {
 		lna_attenuation = 0;
 	}
 	set_lna_attenuation(lna_attenuation, 3);
+}
+
+uint8_t get_lna_pout(volatile uint16_t adcResultsDMA[3]) {
+	//float pout = -9.829 + 20.2671*log10(adcResultsDMA[0]);
+	float pout_voltage = (float) adcResultsDMA[0] / 4096;
+	pout_voltage = 3.3 * pout_voltage;
+	if (pout_voltage >= 1.42)
+		 return 0;
+	else if (pout_voltage < 1.42 && pout_voltage > 1.24)
+		return 27.777 * pout_voltage - 39.444;
+	else if (adcResultsDMA[0] == 1.24)
+		return -5;
+	else if (pout_voltage < 1.24 && pout_voltage > 1.079)
+		return 31.0559 * pout_voltage - 43.5093;
+	else if (pout_voltage == 1.079)
+		return -10;
+	else if (pout_voltage < 1.079 && pout_voltage > 0.85)
+		return 21.8341 * pout_voltage - 33.559;
+	else if (pout_voltage == 0.85)
+		return -15;
+	else if (pout_voltage < 0.85 && pout_voltage > 0.682)
+		return 29.7619 * pout_voltage - 40.2976;
+	else if (pout_voltage == 0.682)
+		return -20;
+	else if (pout_voltage < 0.682 && pout_voltage > 0.466)
+		return 23.14181 * pout_voltage - 35.787;
+	else if (pout_voltage == 0.466)
+		return -25;
+	else if (pout_voltage < 0.466 && pout_voltage > 0.358)
+		return 46.2963 * pout_voltage - 46.5741;
+	else if (pout_voltage == 0.358)
+		return -30;
+	else if (pout_voltage < 0.358 && pout_voltage > 0.28)
+		return 64.9351 * pout_voltage - 53.2468;
+	else if (adcResultsDMA[0] <= 0.28)
+		return -35;
+
+	return -40;
 }
 
 /* USER CODE END 0 */
@@ -301,7 +340,6 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
-
   /* USER CODE BEGIN 2 */
 	// Calibrate The ADC On Power-Up For Better Accuracy
 	// HAL_ADCEx_Calibration_Start(&hadc1);
@@ -311,7 +349,6 @@ int main(void)
 	uint8_t bytes_readed;
     uint8_t i = 0;
     uint8_t addr = 0;
-    uint8_t Buffer[25] = {0};
 
     for(i=0; i<=128; i++)
     {
@@ -370,9 +407,11 @@ int main(void)
 		}
 
 		if (adcConversionComplete == 1) {
-			lna.pout = adcResultsDMA[0];
+			lna.pout = get_lna_pout(adcResultsDMA);
 			lna.current = LNA_MULTIPLIER * (float) adcResultsDMA[1] / 4096.0f;
 			adcConversionComplete = 0;
+
+
 		}
 		HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 3);
 		HAL_Delay(10);
