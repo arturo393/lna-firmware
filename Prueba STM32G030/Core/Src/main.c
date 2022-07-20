@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -80,7 +81,8 @@ enum EEPROM_ADDR {
 	LNA_POUT_DBM_MAX_ADDR = 0x02,
 	LNA_POUT_ADC_MAX_ADDR = 0x03,
 	LNA_POUT_ADC_MIN_ADDR = 0x05,
-	LNA_POUT_CALIBRATION_ADDR = 0x07
+	LNA_POUT_CALIBRATION_ADDR = 0x07,
+	LNA_POUT_DBM_ADDR = 0x08
 };
 
 #define EEPROM_CHIP_ADDR 0x50
@@ -91,7 +93,10 @@ enum EEPROM_ADDR {
 #define UART_DATA_ARRIVED 0x20
 #define LNA_POUT_DBM_MAX_CALIBRATION 0x01
 #define LNA_POUT_DBM_MIN_CALIBRATION 0x02
-#define LNA_POUT_CALIBRATION_OK
+#define LNA_POUT_DBM_MAX  0
+#define LNA_POUT_DBM_MIN -30
+#define LNA_POUT_ADC_MAX 1833
+#define LNA_POUT_ADC_MIN 488
 
 struct Lna {
 	uint8_t attenuation;
@@ -163,6 +168,19 @@ void EEPROM_Write(uint8_t address, uint8_t data) {
 	stored_data = EEPROM_Read(address);
 	if (stored_data != data)
 		HAL_I2C_Master_Transmit(&hi2c1, EEPROM_CHIP_ADDR << 1, buff, 2, 100);
+}
+
+void EEPROM_2byte_Write(uint8_t addr, uint16_t data) {
+	EEPROM_Write(addr, data & 0xff);
+	EEPROM_Write(addr + 1, data >> 8);
+}
+
+uint8_t EEPROM_2byte_Read(uint8_t address) {
+	uint16_t data = 0;
+	data = EEPROM_Read(address + 1) << 8;
+	data |= EEPROM_Read(address);
+
+	return data;
 }
 
 uint8_t check_crc(uint8_t *frame, uint8_t len, uint8_t *crc_frame) {
@@ -310,6 +328,17 @@ uint8_t get_lna_gain(uint16_t gain) {
 	return 0;
 }
 
+void get_lna_pout_straight_from_eeprom(float *slope, float *intercept) {
+
+	int8_t dbm_max = 0;
+	int8_t dbm_min = -30;
+	uint16_t adc_max = EEPROM_2byte_Read(LNA_POUT_ADC_MAX_ADDR);
+	uint16_t adc_min = EEPROM_2byte_Read(LNA_POUT_ADC_MIN_ADDR);
+
+	*slope = (dbm_max - dbm_min) / (float) (adc_max - adc_min);
+	*intercept = dbm_max - adc_max * *slope;
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -340,7 +369,7 @@ int main(void) {
 	MX_ADC1_Init();
 	MX_I2C1_Init();
 	MX_USART1_UART_Init();
-//	MX_IWDG_Init();
+	//MX_IWDG_Init();
 	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
@@ -349,29 +378,19 @@ int main(void) {
 
 	// Calibrate The ADC On Power-Up For Better Accuracy
 	HAL_ADCEx_Calibration_Start(&hadc1);
-	uart_send_frame("LNA init\n\r", 12);
+	uart_send_str((uint8_t*) "LNA init\n\r");
 	struct Lna lna;
 	uint8_t bytes_readed;
 	lna.attenuation = init_lna_value();
-
 	float m;
 	float b;
-	uint16_t pot_adc_max = 1833;
-	uint16_t pot_adc_min = 488;
-	int8_t pot_dbm_max = 0;
-	int8_t pot_dbm_min = -30;
 
-	if (EEPROM_Read(LNA_POUT_CALIBRATION_ADDR) == 0xAA) {
-		pot_adc_max = 0;
-		pot_adc_min = 0;
-		pot_adc_max = EEPROM_Read(LNA_POUT_ADC_MAX_ADDR + 1) << 8;
-		pot_adc_max |= EEPROM_Read(LNA_POUT_ADC_MAX_ADDR);
-		pot_adc_min = EEPROM_Read(LNA_POUT_ADC_MIN_ADDR + 1) << 8;
-		pot_adc_min |= EEPROM_Read(LNA_POUT_ADC_MIN_ADDR);
+	if (EEPROM_Read(LNA_POUT_CALIBRATION_ADDR) != 0xAA) {
+		EEPROM_2byte_Write(LNA_POUT_ADC_MIN_ADDR, LNA_POUT_ADC_MIN);
+		EEPROM_2byte_Write(LNA_POUT_ADC_MAX_ADDR, LNA_POUT_ADC_MAX);
 	}
 
-	m = (pot_dbm_max - pot_dbm_min) / (float) (pot_adc_max - pot_adc_min);
-	b = pot_dbm_max - pot_adc_max * m;
+	get_lna_pout_straight_from_eeprom(&m, &b);
 
 	/* USER CODE END 2 */
 
@@ -382,14 +401,15 @@ int main(void) {
 
 	while (1) {
 
-		if (STATUS_FLAGS & LNA_POUT_DBM_MAX_CALIBRATION) {
-			pot_adc_max = adcResultsDMA[0];
-			uart_send_str("Max Pout value calibration On\n");
-		} else if (STATUS_FLAGS & LNA_POUT_DBM_MIN_CALIBRATION) {
-			pot_adc_min = adcResultsDMA[0];
-			uart_send_str("Min Pout value calibration On\n");
-		}
-
+		/*
+		 if (STATUS_FLAGS & LNA_POUT_DBM_MAX_CALIBRATION) {
+		 pot_adc_max = adcResultsDMA[0];
+		 //	uart_send_str("Max Pout value calibration On\n");
+		 } else if (STATUS_FLAGS & LNA_POUT_DBM_MIN_CALIBRATION) {
+		 pot_adc_min = adcResultsDMA[0];
+		 //	uart_send_str("Min Pout value calibration On\n");
+		 }
+		 */
 		//Fin function 1 second
 		/* USER CODE END WHILE */
 
@@ -412,87 +432,63 @@ int main(void) {
 				if (UART1_rxBuffer[start_index + 1] == LNA_MODULE_FUNCTION) {
 					if (UART1_rxBuffer[start_index + 3]
 							== LNA_PARAMETER_QUERY_ID) {
-						uint8_t ltel_frame[14];
-						create_lna_frame(ltel_frame, lna);
-						uart_send_frame(ltel_frame, 14);
+						uint8_t *frame_test = (uint8_t*) malloc(14);
+						create_lna_frame(frame_test, lna);
+						uart_send_frame(frame_test, 14);
+						free(frame_test);
 					} else if (UART1_rxBuffer[start_index + 3] == LNA_SET_ATT_ID) {
 						lna.attenuation = UART1_rxBuffer[start_index + 6];
 						HAL_Delay(1); //Delay de 1mS
 						set_lna_attenuation(lna.attenuation, 3);
 						EEPROM_Write(LNA_ATT_ADDR, lna.attenuation);
-
 					} else if (UART1_rxBuffer[start_index + 3]
 							== LNA_POUT_MAX_CALIBRATION_ID) {
-
-						if (UART1_rxBuffer[start_index + 4] == 0x01) {
-							STATUS_FLAGS |= LNA_POUT_DBM_MAX_CALIBRATION;
-
-						} else {
-							if (STATUS_FLAGS & LNA_POUT_DBM_MAX_CALIBRATION) {
-								EEPROM_Write(LNA_POUT_ADC_MAX_ADDR,
-										pot_adc_max & 0xff);
-								EEPROM_Write(LNA_POUT_ADC_MAX_ADDR + 1,
-										pot_adc_max >> 8);
-								EEPROM_Write(LNA_POUT_CALIBRATION_ADDR, 0xAA);
-								m = (pot_dbm_max - pot_dbm_min)
-										/ (float) (pot_adc_max - pot_adc_min);
-								b = pot_dbm_max - pot_adc_max * m;
-								STATUS_FLAGS ^= LNA_POUT_DBM_MAX_CALIBRATION;
-							}
-						}
+						EEPROM_2byte_Write(LNA_POUT_ADC_MAX_ADDR,
+								adcResultsDMA[0]);
+						EEPROM_Write(LNA_POUT_CALIBRATION_ADDR, 0xAA);
+						get_lna_pout_straight_from_eeprom(&m, &b);
 					} else if (UART1_rxBuffer[start_index + 3]
 							== LNA_POUT_MIN_CALIBRATION_ID) {
-
-						if (UART1_rxBuffer[start_index + 4] == 0x01) {
-							STATUS_FLAGS |= LNA_POUT_DBM_MIN_CALIBRATION;
-
-						} else {
-							if (STATUS_FLAGS & LNA_POUT_DBM_MIN_CALIBRATION) {
-								EEPROM_Write(LNA_POUT_ADC_MIN_ADDR,
-										pot_adc_min & 0xff);
-								EEPROM_Write(LNA_POUT_ADC_MIN_ADDR + 1,
-										pot_adc_min >> 8);
-								EEPROM_Write(LNA_POUT_CALIBRATION_ADDR, 0xAA);
-								m = (pot_dbm_max - pot_dbm_min)
-										/ (float) (pot_adc_max - pot_adc_min);
-								b = pot_dbm_max - pot_adc_max * m;
-								STATUS_FLAGS ^= LNA_POUT_DBM_MIN_CALIBRATION;
-							}
-						}
+						EEPROM_2byte_Write(LNA_POUT_ADC_MIN_ADDR,
+								adcResultsDMA[0]);
+						EEPROM_Write(LNA_POUT_CALIBRATION_ADDR, 0xAA);
+						get_lna_pout_straight_from_eeprom(&m, &b);
 					}
+
 				}
 				start_index = -1;
 			}
-
 			HAL_UART_DMAResume(&huart1);
 		}
 
 		if (STATUS_FLAGS & ADC_CONVERSION_COMPLETE) {
-
-			if (adcResultsDMA[0] > pot_adc_max) {
-				lna.pout = pot_dbm_max;
-			} else if (adcResultsDMA[0] < pot_adc_min) {
-				lna.pout = pot_dbm_min;
+			uint16_t adc_max = EEPROM_2byte_Read(LNA_POUT_ADC_MAX_ADDR);
+			uint16_t adc_min = EEPROM_2byte_Read(LNA_POUT_ADC_MIN_ADDR);
+			if (adcResultsDMA[0] > EEPROM_2byte_Read(LNA_POUT_ADC_MAX_ADDR)) {
+				lna.pout = LNA_POUT_DBM_MAX;
+			} else if (adcResultsDMA[0] < EEPROM_2byte_Read(LNA_POUT_ADC_MIN_ADDR)) {
+				lna.pout = LNA_POUT_DBM_MIN;
 			} else {
 				lna.pout = (int8_t) (m * (float) adcResultsDMA[0] + b);
 			}
-
+			EEPROM_Write(LNA_POUT_DBM_ADDR, lna.pout);
 			lna.current = LNA_CURRENT_MULTIPLIER * adcResultsDMA[1] / 4096.0f;
-
 			lna.gain = get_lna_gain(adcResultsDMA[2]);
 			lna.pin = lna.pout - lna.gain + lna.attenuation;
 			STATUS_FLAGS ^= ADC_CONVERSION_COMPLETE;
-			uint8_t str[100];
-			sprintf(str,
-					"Pout_dBm %d \t Pout_adc %d \t Gain_dB %d \t Gain_adc %d\r\n",
-					lna.pout, adcResultsDMA[0], lna.gain, adcResultsDMA[2]);
-			uart_send_str(str);
-			HAL_Delay(500); // for UART1_rx buffer complete readings
+		     uint8_t *str =(uint8_t*) malloc(100);
+			 sprintf(str,
+			 "Pout_dBm %d \t Pout_adc %d \t Gain_dB %d \t Gain_adc %d\r\n",
+			 lna.pout, adcResultsDMA[0], lna.gain, adcResultsDMA[2]);
+			 uart_send_str(str);
+			 free(str);
+			 HAL_Delay(500); // for UART1_rx buffer complete readings
+
 		}
 
 		HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 3);
 		HAL_Delay(5); // for UART1_rx buffer complete readings
-		//	HAL_IWDG_Refresh(&hiwdg);
+		//HAL_IWDG_Refresh(&hiwdg);
 
 	}   //Fin while
 	/* USER CODE END 3 */
