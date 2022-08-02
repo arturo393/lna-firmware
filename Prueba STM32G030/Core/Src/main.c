@@ -59,6 +59,7 @@ DMA_HandleTypeDef hdma_usart1_rx;
 #define TX_UART1_BUFFLEN  100
 #define LTEL_FRAME_SIZE 14
 #define SIGMA_FRAME_SIZE 14
+#define MEDIA_NUM 20
 
 static const uint8_t MODULE_ADDR = 0x08;
 static const uint8_t MODULE_FUNCTION = 0x09;
@@ -91,7 +92,7 @@ static uint8_t POUT_ISCALIBRATED_ADDR = 0x07;
 
 static uint8_t POUT_ISCALIBRATED = 0xAA;
 
-#define  MEDIA_NUM 20
+
 
 struct Lna {
 	uint8_t attenuation;
@@ -123,33 +124,9 @@ bool isDataReady = false;
 bool isLnaModule = false;
 bool isLnaAddr = false;
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
-	if (adc_counter < MEDIA_NUM) {
-		adc0_values[adc_counter] = adcResultsDMA[0];
-		adc1_values[adc_counter] = adcResultsDMA[1];
-		adc2_values[adc_counter] = adcResultsDMA[2];
-		adc3_values[adc_counter] = adcResultsDMA[3];
-		adc_counter++;
-	} else {
-		uint32_t sum0 = 0;
-		uint32_t sum1 = 0;
-		uint32_t sum2 = 0;
-		uint32_t sum3 = 0;
-		for (int i = 0; i < MEDIA_NUM; i++) {
-			sum0 += adcResultsDMA[0];
-			sum1 += adcResultsDMA[1];
-			sum2 += adcResultsDMA[2];
-			sum3 += adcResultsDMA[3];
-		}
-		adc0_media = sum0 / MEDIA_NUM;
-		adc1_media = sum1 / MEDIA_NUM;
-		adc2_media = sum2 / MEDIA_NUM;
-		adc3_media = sum3 / MEDIA_NUM;
-	}
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size);
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc);
 
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
-	IS_CONVERSION_COMPLETE = true;
-}
 
 /* USER CODE END PV */
 
@@ -172,6 +149,8 @@ struct Lna get_lna();
 void set_attenuation(uint8_t attenuation, uint8_t times);
 void uart_send_frame(uint8_t *str, uint8_t len);
 void uart_send_str(uint8_t *str);
+
+
 //void uart_reset_reading(UART_HandleTypeDef *huart);
 /* USER CODE END PFP */
 
@@ -309,12 +288,7 @@ int main(void)
 			}
 
 		}
-
-		//	}
-
 		HAL_IWDG_Refresh(&hiwdg);
-		//	HAL_Delay(100); // for UART1_rx buffer complete readings
-
 	}   //Fin while
   /* USER CODE END 3 */
 }
@@ -823,6 +797,36 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size) {
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, &rxByte, 1);
 	__HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
 
+}
+
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
+
+	if (adc_counter < MEDIA_NUM) {
+		adc0_values[adc_counter] = adcResultsDMA[0];
+		adc1_values[adc_counter] = adcResultsDMA[1];
+		adc2_values[adc_counter] = adcResultsDMA[2];
+		adc3_values[adc_counter] = adcResultsDMA[3];
+		adc_counter++;
+	} else {
+		uint32_t sum0 = 0;
+		uint32_t sum1 = 0;
+		uint32_t sum2 = 0;
+		uint32_t sum3 = 0;
+		for (int i = 0; i < MEDIA_NUM; i++) {
+			sum0 += adcResultsDMA[0];
+			sum1 += adcResultsDMA[1];
+			sum2 += adcResultsDMA[2];
+			sum3 += adcResultsDMA[3];
+		}
+		adc0_media = sum0 / MEDIA_NUM;
+		adc1_media = sum1 / MEDIA_NUM;
+		adc2_media = sum2 / MEDIA_NUM;
+		adc3_media = sum3 / MEDIA_NUM;
+	}
+
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
+	IS_CONVERSION_COMPLETE = true;
 }
 /* USER CODE END 4 */
 
