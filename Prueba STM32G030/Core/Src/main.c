@@ -21,9 +21,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include "eeprom.h"
+#include "utils.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,68 +55,66 @@ DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
 
-#define MINIMUN_FRAME_SIZE 7
-#define LNA_MODULE_ADDR 0x08
-#define LNA_MODULE_FUNCTION 0x09
+#define RX_UART1_BUFFLEN  40
 
-enum LNA_CMD {
-	LNA_PARAMETER_QUERY_ID = 0x11,
-	LNA_POUT_MAX_CALIBRATION_ID = 0x14,
-	LNA_POUT_MIN_CALIBRATION_ID = 0x13
-};
+static const uint8_t MINIMUN_FRAME_SIZE = 7;
+static const uint8_t MODULE_ADDR = 0x08;
+static const uint8_t MODULE_FUNCTION = 0x09;
 
-#define LNA_SET_ATT_ID 0x20
-#define LNA_VREF 3.28f // volts * 1000
-#define LNA_CURRENT_FACTOR  2.2f/200.0f  // 2,2 [v] / 200 [A]
-#define LNA_CURRENT_MULTIPLIER (LNA_VREF)/(LNA_CURRENT_FACTOR)
+static const uint8_t QUERY_PARAMETER_LTEL = 0x11;
+static const uint8_t QUERY_PARAMETER_STR = 0x15;
+static const uint8_t QUERY_ADC = 0x16;
 
-#define LNA_MULTIPLIER 298
-#define TXBUFLEN 40
-#define RX_UART1_BUFFLEN 20
+static const uint8_t SET_ATT_LTEL = 0x20;
+static const uint8_t SET_POUT_MAX = 0x24;
+static const uint8_t SET_POUT_MIN = 0x23;
 
-#define  START_MARK  0x7e
-#define  END_MARK  0x7f
+//static const float LNA_VREF = 3.28f; // volts * 1000
+//static const float LNA_CURRENT_FACTOR = 2.2f/200.0f;  // 2,2 [v] / 20static uint8_t0 [A]
+//static const float LNA_CURRENT_MULTIPLIER = (LNA_VREF)/(LNA_CURRENT_FACTOR);
+static const float ADC_CURRENT_FACTOR = 298.1818182f;
+static const float ADC_VOLTAGE_FACTOR = 0.007404330f;
 
-enum EEPROM_ADDR {
-	LNA_ATT_ADDR = 0x00,
-	LNA_POUT_DBM_MIN_ADDR = 0x01,
-	LNA_POUT_DBM_MAX_ADDR = 0x02,
-	LNA_POUT_ADC_MAX_ADDR = 0x03,
-	LNA_POUT_ADC_MIN_ADDR = 0x05,
-	LNA_POUT_CALIBRATION_ADDR = 0x07,
-	LNA_POUT_DBM_ADDR = 0x08
-};
+static const uint8_t LTEL_START_MARK = 0x7e;
+static const uint8_t LTEL_END_MARK = 0x7f;
 
-#define EEPROM_CHIP_ADDR 0x50
-#define EEPROM_PAGE_SIZE 8
-#define EEPrOM_PAGE_NUM 32
 
-#define ADC_CONVERSION_COMPLETE 0x10
-#define UART_DATA_ARRIVED 0x20
-#define LNA_POUT_DBM_MAX_CALIBRATION 0x01
-#define LNA_POUT_DBM_MIN_CALIBRATION 0x02
-#define LNA_POUT_DBM_MAX  0
-#define LNA_POUT_DBM_MIN -30
-#define LNA_POUT_ADC_MAX 1833
-#define LNA_POUT_ADC_MIN 488
+
+//static const uint8_t UART_DATA_ARRIVED = 0x20;
+
+static const uint8_t POUT_DBM_MAX = 0;
+static const uint8_t POUT_DBM_MIN = -30;
+static const uint16_t POUT_ADC_MAX = 1833;
+static const uint16_t POUT_ADC_MIN = 488;
+
+static uint8_t LNA_ATT_ADDR = 0x00;
+//static uint8_t POUT_DBM_MIN_ADDR = 0x01;
+//static uint8_t POUT_DBM_MAX_ADDR = 0x02;
+static uint8_t POUT_ADC_MAX_ADDR = 0x03;
+static uint8_t POUT_ADC_MIN_ADDR = 0x05;
+static uint8_t POUT_ISCALIBRATED_ADDR = 0x07;
+//static uint8_t POUT_DBM_ADDR = 0x08;
+
+static uint8_t POUT_ISCALIBRATED = 0xAA;
 
 struct Lna {
 	uint8_t attenuation;
 	uint8_t gain;
 	int8_t pout;
 	uint8_t current;
-	uint8_t pin;
+	int8_t pin;
+	float voltage;
 };
 
-uint8_t STATUS_FLAGS = 0x00;
 
-volatile uint16_t adcResultsDMA[3];
+volatile uint16_t adcResultsDMA[4];
+bool IS_CONVERSION_COMPLETE = false;
+uint8_t uart_readed_bytes;
+uint8_t UART1_rxBuffer[RX_UART1_BUFFLEN] = { 0 };
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	STATUS_FLAGS |= UART_DATA_ARRIVED;
-}
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
-	STATUS_FLAGS |= ADC_CONVERSION_COMPLETE;
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
+	IS_CONVERSION_COMPLETE = true;
 }
 
 /* USER CODE END PV */
@@ -129,215 +129,21 @@ static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 
+uint8_t ltel_get_start_index(uint8_t *rxBuffer);
+void ltel_set_parameter_frame(uint8_t *frame, struct Lna lna);
+uint8_t get_db_gain(uint16_t adc_gain);
+uint8_t get_dbm_pout(uint16_t pout_adc);
+struct Lna get_lna();
+void set_attenuation(uint8_t attenuation, uint8_t times);
+void uart_send_frame(uint8_t *str, uint8_t len);
+void uart_send_str(uint8_t *str);
+void uart_reset_reading(UART_HandleTypeDef *huart);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint16_t get_crc_calc(uint8_t buffer[], uint8_t buff_len) {
-	uint8_t b;
-	uint8_t i;
-	uint16_t generator = 0x1021; //divisor is 16bit
-	uint16_t crc = 0;			 // CRC value is 16bit
 
-	for (b = 0; b < buff_len; b++) {
-		crc ^= ((uint16_t) (buffer[b] << 8)); // move byte into MSB of 16bit CRC
-		for (i = 0; i < 8; i++) {
-			if ((crc & 0x8000) != 0) // test for MSB = bit 15
-				crc = ((uint16_t) ((crc << 1) ^ generator));
-			else
-				crc <<= 1;
-		}
-	}
-	return crc;
-}
 
-uint8_t EEPROM_Read(uint8_t address) {
-	uint8_t buff[2];
-	buff[0] = address;
-	HAL_I2C_Master_Transmit(&hi2c1, EEPROM_CHIP_ADDR << 1, buff, 1, 100);
-	HAL_I2C_Master_Receive(&hi2c1, EEPROM_CHIP_ADDR << 1 | 1, &buff[1], 1, 100);
-	return buff[1];
-}
-
-void EEPROM_Write(uint8_t address, uint8_t data) {
-	uint8_t buff[2];
-	uint8_t stored_data;
-	buff[0] = address;
-	buff[1] = data;
-
-	stored_data = EEPROM_Read(address);
-	if (stored_data != data)
-		HAL_I2C_Master_Transmit(&hi2c1, EEPROM_CHIP_ADDR << 1, buff, 2, 100);
-}
-
-void EEPROM_2byte_Write(uint8_t addr, uint16_t data) {
-	EEPROM_Write(addr, data & 0xff);
-	EEPROM_Write(addr + 1, data >> 8);
-}
-
-uint8_t EEPROM_2byte_Read(uint8_t address) {
-	uint16_t data = 0;
-	data = EEPROM_Read(address + 1) << 8;
-	data |= EEPROM_Read(address);
-
-	return data;
-}
-
-uint8_t check_crc(uint8_t *frame, uint8_t len, uint8_t *crc_frame) {
-
-	uint16_t crc;
-	uint8_t crc_valid = 1;
-	uint8_t testframe[2];
-	crc = get_crc_calc(frame, len);
-	memcpy(testframe, &crc, 2);
-	if (testframe[1] == crc_frame[1] && testframe[0] == crc_frame[0]) {
-		crc_valid = 1;
-	} else {
-		crc_valid = 0;
-	}
-	return crc_valid;;
-}
-
-void set_lna_attenuation(uint8_t attenuation, uint8_t times) {
-	attenuation *= 2;
-	for (uint8_t i = 0; i < times; i++) {
-		uint8_t mask = 0b00100000;
-		for (uint8_t i = 0; i < 6; i++) {
-			//Ciclo for de 6 vueltas para enviar los 6bits de configuración
-			if (mask & attenuation) {
-				//Si el bit de la mascara en 1 coincide con el bit del valor, entonces
-				HAL_GPIO_WritePin(GPIOA, DATA_ATTENUATOR_Pin, GPIO_PIN_SET); //Pin data en alto
-			} else {
-				HAL_GPIO_WritePin(GPIOA, DATA_ATTENUATOR_Pin, GPIO_PIN_RESET); //Pin data en bajo
-			}
-			HAL_GPIO_WritePin(GPIOA, CLK_ATTENUATOR_Pin, GPIO_PIN_SET); //Pin clock en alto
-			HAL_Delay(1); //Delay de 1mS
-			HAL_GPIO_WritePin(GPIOA, CLK_ATTENUATOR_Pin, GPIO_PIN_RESET); //Pin clock en bajo
-			mask = mask >> 1; //Muevo la máscara una posición
-		}
-		HAL_GPIO_WritePin(GPIOA, LE_ATTENUATOR_Pin, GPIO_PIN_SET); //Pin LE en alto
-		HAL_Delay(1);
-		HAL_GPIO_WritePin(GPIOA, LE_ATTENUATOR_Pin, GPIO_PIN_RESET); //Pin LE en bajo
-	}
-
-}
-
-void create_lna_frame(uint8_t *frame, struct Lna lna) {
-	uint8_t crc_frame[2];
-	uint16_t crc;
-	frame[0] = START_MARK;
-	frame[1] = LNA_MODULE_FUNCTION;
-	frame[2] = LNA_MODULE_ADDR;
-	frame[3] = LNA_PARAMETER_QUERY_ID;
-	frame[4] = 0x00;
-	frame[5] = 0x05;
-	frame[6] = 0x00;
-	frame[7] = lna.attenuation;
-	frame[8] = lna.gain;
-	frame[9] = lna.pout;
-	frame[10] = lna.pout;
-	crc = get_crc_calc(&(frame[1]), 10);
-	memcpy(crc_frame, &crc, 2);
-	frame[11] = crc_frame[0];
-	frame[12] = crc_frame[1];
-	frame[13] = END_MARK;
-}
-
-void uart_send_frame(uint8_t *str, uint8_t len) {
-	HAL_GPIO_WritePin(GPIOA, DE_Pin, GPIO_PIN_SET);
-	//HAL_Delay(10);
-	HAL_UART_Transmit(&huart1, str, len, 100);
-	//HAL_Delay(10);
-	HAL_GPIO_WritePin(GPIOA, DE_Pin, GPIO_PIN_RESET);
-
-}
-
-void uart_send_str(uint8_t *str) {
-	uint8_t i;
-	for (i = 0; str[i] != '\0'; i++)
-		;
-	HAL_GPIO_WritePin(GPIOA, DE_Pin, GPIO_PIN_SET);
-	HAL_UART_Transmit(&huart1, str, i, 100);
-	HAL_GPIO_WritePin(GPIOA, DE_Pin, GPIO_PIN_RESET);
-}
-
-uint8_t get_valid_start_index(uint8_t *rxBuffer) {
-	uint8_t start_index = -1;
-	for (uint8_t i = 0; i < RX_UART1_BUFFLEN - MINIMUN_FRAME_SIZE; i++) {
-		if (start_index == (uint8_t) -1) {
-			if (rxBuffer[i] == (uint8_t) START_MARK)
-				start_index = rxBuffer[i + 1] == LNA_MODULE_FUNCTION ? i : -1;
-			else
-				start_index = -1;
-		} else {
-			// if(start_index > 0 )
-			if (rxBuffer[i] == (uint8_t) END_MARK) {
-				if (i > MINIMUN_FRAME_SIZE) {
-					uint16_t crc_rcv;
-					uint16_t crc_calc;
-					uint8_t data_start_index = start_index + 1;
-					crc_calc = get_crc_calc(&(rxBuffer[data_start_index]),
-							i - data_start_index - 2);
-					crc_rcv = rxBuffer[i - 1] << 8 | rxBuffer[i - 2];
-					return crc_calc == crc_rcv ? start_index : -1;
-				}
-			}
-			// end if endmark}
-			// end if startmark}
-
-		}
-	}
-	return -1;
-}
-
-uint8_t init_lna_value() {
-	uint8_t lna_attenuation = 0;
-	lna_attenuation = EEPROM_Read(LNA_ATT_ADDR);
-	if (lna_attenuation < 0 || lna_attenuation > 31) {
-		lna_attenuation = 0;
-	}
-	set_lna_attenuation(lna_attenuation, 3);
-
-	return lna_attenuation;
-}
-
-uint8_t get_lna_gain(uint16_t gain) {
-
-	if (gain >= 3781)
-		return 45;
-	else if (gain < 3781 && gain >= 1515)
-		return 0.0022f * gain + 36.6571f;
-	else if (gain < 1515 && gain >= 1188)
-		return (0.0153f * gain + 16.8349f);
-	else if (gain < 1188 && gain >= 1005)
-		return (0.0273f * gain + 2.540f);
-	else if (gain < 1005 && gain >= 897)
-		return (0.0463f * gain - 16.5278f);
-	else if (gain < 897 && gain >= 825)
-		return (0.0694f * gain - 37.2917f);
-	else if (gain < 825 && gain >= 776)
-		return (0.1020f * gain - 64.1837f);
-	else if (gain < 776 && gain >= 746)
-		return (0.1667f * gain - 114.333f);
-	else if (gain < 746 && gain >= 733)
-		return (0.3846f * gain - 276.9231f);
-	else if (gain < 733 && gain >= 725)
-		return (0.625f * gain - 453.125f);
-	else if (gain < 725)
-		return 0;
-	return 0;
-}
-
-void get_lna_pout_straight_from_eeprom(float *slope, float *intercept) {
-
-	int8_t dbm_max = 0;
-	int8_t dbm_min = -30;
-	uint16_t adc_max = EEPROM_2byte_Read(LNA_POUT_ADC_MAX_ADDR);
-	uint16_t adc_min = EEPROM_2byte_Read(LNA_POUT_ADC_MIN_ADDR);
-
-	*slope = (dbm_max - dbm_min) / (float) (adc_max - adc_min);
-	*intercept = dbm_max - adc_max * *slope;
-}
 
 /* USER CODE END 0 */
 
@@ -363,13 +169,12 @@ int main(void) {
 	SystemClock_Config();
 
 	/* USER CODE BEGIN SysInit */
-
 	MX_DMA_Init();
 	MX_GPIO_Init();
 	MX_ADC1_Init();
 	MX_I2C1_Init();
 	MX_USART1_UART_Init();
-	//MX_IWDG_Init();
+	// MX_IWDG_Init();
 	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
@@ -379,80 +184,93 @@ int main(void) {
 	// Calibrate The ADC On Power-Up For Better Accuracy
 	HAL_ADCEx_Calibration_Start(&hadc1);
 	uart_send_str((uint8_t*) "LNA init\n\r");
-	struct Lna lna;
-	uint8_t bytes_readed;
-	lna.attenuation = init_lna_value();
-	float m;
-	float b;
+	set_attenuation(EEPROM_Read(LNA_ATT_ADDR), 3);
 
-	if (EEPROM_Read(LNA_POUT_CALIBRATION_ADDR) != 0xAA) {
-		EEPROM_2byte_Write(LNA_POUT_ADC_MIN_ADDR, LNA_POUT_ADC_MIN);
-		EEPROM_2byte_Write(LNA_POUT_ADC_MAX_ADDR, LNA_POUT_ADC_MAX);
+	if (EEPROM_Read(POUT_ISCALIBRATED_ADDR) != POUT_ISCALIBRATED) {
+		EEPROM_2byte_Write(POUT_ADC_MIN_ADDR, POUT_ADC_MIN);
+		EEPROM_2byte_Write(POUT_ADC_MAX_ADDR, POUT_ADC_MAX);
 	}
-
-	get_lna_pout_straight_from_eeprom(&m, &b);
 
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	uint8_t UART1_rxBuffer[20] = { 0 };
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 3);
+
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
 
 	while (1) {
 
-		/*
-		 if (STATUS_FLAGS & LNA_POUT_DBM_MAX_CALIBRATION) {
-		 pot_adc_max = adcResultsDMA[0];
-		 //	uart_send_str("Max Pout value calibration On\n");
-		 } else if (STATUS_FLAGS & LNA_POUT_DBM_MIN_CALIBRATION) {
-		 pot_adc_min = adcResultsDMA[0];
-		 //	uart_send_str("Min Pout value calibration On\n");
-		 }
-		 */
 		//Fin function 1 second
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
 
 		HAL_UART_Receive_DMA(&huart1, UART1_rxBuffer, RX_UART1_BUFFLEN);
-		bytes_readed = RX_UART1_BUFFLEN - (huart1.hdmarx->Instance->CNDTR);
+		uart_readed_bytes = RX_UART1_BUFFLEN - (huart1.hdmarx->Instance->CNDTR);
 
-		if (bytes_readed > MINIMUN_FRAME_SIZE) {
+		if (uart_readed_bytes > MINIMUN_FRAME_SIZE) {
 
 			HAL_UART_DMAPause(&huart1);
-			huart1.hdmarx->Instance->CCR &= ~DMA_CCR_EN; // disable
-			huart1.hdmarx->Instance->CNDTR = 20; // reset lna_attenuation
-			huart1.hdmarx->Instance->CCR |= DMA_CCR_EN; // re-enable
-			//data_arrive = 0;
-			STATUS_FLAGS ^= UART_DATA_ARRIVED;
-			uint8_t start_index = get_valid_start_index(UART1_rxBuffer);
+			uart_reset_reading(&huart1);
+
+			uint8_t start_index = ltel_get_start_index(UART1_rxBuffer);
 
 			if (start_index != (uint8_t) -1) {
-				if (UART1_rxBuffer[start_index + 1] == LNA_MODULE_FUNCTION) {
-					if (UART1_rxBuffer[start_index + 3]
-							== LNA_PARAMETER_QUERY_ID) {
-						uint8_t *frame_test = (uint8_t*) malloc(14);
-						create_lna_frame(frame_test, lna);
-						uart_send_frame(frame_test, 14);
-						free(frame_test);
-					} else if (UART1_rxBuffer[start_index + 3] == LNA_SET_ATT_ID) {
-						lna.attenuation = UART1_rxBuffer[start_index + 6];
-						HAL_Delay(1); //Delay de 1mS
-						set_lna_attenuation(lna.attenuation, 3);
-						EEPROM_Write(LNA_ATT_ADDR, lna.attenuation);
-					} else if (UART1_rxBuffer[start_index + 3]
-							== LNA_POUT_MAX_CALIBRATION_ID) {
-						EEPROM_2byte_Write(LNA_POUT_ADC_MAX_ADDR,
+
+				uint8_t module_function_index = UART1_rxBuffer[start_index + 1];
+				uint8_t module_address_index = UART1_rxBuffer[start_index + 2];
+
+				if (module_function_index == MODULE_FUNCTION
+						&& module_address_index == MODULE_ADDR) {
+					uint8_t lna_cmd = UART1_rxBuffer[start_index + 3];
+
+					if (lna_cmd == QUERY_PARAMETER_LTEL) {
+						struct Lna lna;
+						uint8_t frame[14];
+						lna = get_lna();
+						ltel_set_parameter_frame(frame, lna);
+						uart_send_frame(frame, 14);
+
+					} else if (lna_cmd == SET_ATT_LTEL) {
+						uint8_t attenuation_value = UART1_rxBuffer[start_index
+								+ 6];
+						set_attenuation(attenuation_value, 3);
+						EEPROM_Write(LNA_ATT_ADDR, attenuation_value);
+					} else if (lna_cmd == SET_POUT_MAX) {
+
+						EEPROM_2byte_Write(POUT_ADC_MAX_ADDR,
 								adcResultsDMA[0]);
-						EEPROM_Write(LNA_POUT_CALIBRATION_ADDR, 0xAA);
-						get_lna_pout_straight_from_eeprom(&m, &b);
-					} else if (UART1_rxBuffer[start_index + 3]
-							== LNA_POUT_MIN_CALIBRATION_ID) {
-						EEPROM_2byte_Write(LNA_POUT_ADC_MIN_ADDR,
+						HAL_Delay(5);
+						EEPROM_Write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
+						uart_send_str((uint8_t*) "Saved Pout max value\n\r");
+
+					} else if (lna_cmd == SET_POUT_MIN) {
+
+						EEPROM_2byte_Write(POUT_ADC_MIN_ADDR,
 								adcResultsDMA[0]);
-						EEPROM_Write(LNA_POUT_CALIBRATION_ADDR, 0xAA);
-						get_lna_pout_straight_from_eeprom(&m, &b);
+						HAL_Delay(5);
+						EEPROM_Write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
+						uart_send_str((uint8_t*) "Saved Pout min value\n\r");
+
+					} else if (lna_cmd == QUERY_PARAMETER_STR) {
+
+						struct Lna lna = get_lna();
+						uint8_t str[100];
+						sprintf(str,
+								"Pout %d [dBm] \t Att %u [dB] \t Gain %u [dB] \t Pin %d [dBm] \t  \t Curent %d [mA] \t Voltage %u [V]\r\n",
+								lna.pout, lna.attenuation, lna.gain, lna.pin,
+								lna.current, (uint8_t) lna.voltage);
+						uart_send_str(str);
+
+					} else if (lna_cmd == QUERY_ADC) {
+
+						uint8_t str[80];
+						sprintf(str,
+								"Pout %d \t Att %d \t Gain %u \t Curent %d \t Voltage %d\r\n",
+								adcResultsDMA[0], adcResultsDMA[1],
+								adcResultsDMA[2], adcResultsDMA[3]);
+						uart_send_str(str);
+
 					}
 
 				}
@@ -461,34 +279,12 @@ int main(void) {
 			HAL_UART_DMAResume(&huart1);
 		}
 
-		if (STATUS_FLAGS & ADC_CONVERSION_COMPLETE) {
-			uint16_t adc_max = EEPROM_2byte_Read(LNA_POUT_ADC_MAX_ADDR);
-			uint16_t adc_min = EEPROM_2byte_Read(LNA_POUT_ADC_MIN_ADDR);
-			if (adcResultsDMA[0] > EEPROM_2byte_Read(LNA_POUT_ADC_MAX_ADDR)) {
-				lna.pout = LNA_POUT_DBM_MAX;
-			} else if (adcResultsDMA[0] < EEPROM_2byte_Read(LNA_POUT_ADC_MIN_ADDR)) {
-				lna.pout = LNA_POUT_DBM_MIN;
-			} else {
-				lna.pout = (int8_t) (m * (float) adcResultsDMA[0] + b);
-			}
-			EEPROM_Write(LNA_POUT_DBM_ADDR, lna.pout);
-			lna.current = LNA_CURRENT_MULTIPLIER * adcResultsDMA[1] / 4096.0f;
-			lna.gain = get_lna_gain(adcResultsDMA[2]);
-			lna.pin = lna.pout - lna.gain + lna.attenuation;
-			STATUS_FLAGS ^= ADC_CONVERSION_COMPLETE;
-		     uint8_t *str =(uint8_t*) malloc(100);
-			 sprintf(str,
-			 "Pout_dBm %d \t Pout_adc %d \t Gain_dB %d \t Gain_adc %d\r\n",
-			 lna.pout, adcResultsDMA[0], lna.gain, adcResultsDMA[2]);
-			 uart_send_str(str);
-			 free(str);
-			 HAL_Delay(500); // for UART1_rx buffer complete readings
-
+		if (IS_CONVERSION_COMPLETE) {
+			// TODO: AGREGAR LECTURAS PROMEDIOS
+			IS_CONVERSION_COMPLETE = false;
 		}
-
-		HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 3);
-		HAL_Delay(5); // for UART1_rx buffer complete readings
 		//HAL_IWDG_Refresh(&hiwdg);
+		HAL_Delay(5); // for UART1_rx buffer complete readings
 
 	}   //Fin while
 	/* USER CODE END 3 */
@@ -566,7 +362,7 @@ static void MX_ADC1_Init(void) {
 	hadc1.Init.LowPowerAutoWait = DISABLE;
 	hadc1.Init.LowPowerAutoPowerOff = DISABLE;
 	hadc1.Init.ContinuousConvMode = DISABLE;
-	hadc1.Init.NbrOfConversion = 3;
+	hadc1.Init.NbrOfConversion = 4;
 	hadc1.Init.DiscontinuousConvMode = DISABLE;
 	hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
 	hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
@@ -601,6 +397,14 @@ static void MX_ADC1_Init(void) {
 	 */
 	sConfig.Channel = ADC_CHANNEL_8;
 	sConfig.Rank = ADC_REGULAR_RANK_3;
+	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+		Error_Handler();
+	}
+
+	/** Configure Regular Channel
+	 */
+	sConfig.Channel = ADC_CHANNEL_7;
+	sConfig.Rank = ADC_REGULAR_RANK_4;
 	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
 		Error_Handler();
 	}
@@ -791,6 +595,161 @@ static void MX_GPIO_Init(void) {
 }
 
 /* USER CODE BEGIN 4 */
+uint8_t ltel_get_start_index(uint8_t *rxBuffer) {
+	uint8_t start_index = -1;
+	for (uint8_t i = 0; i < RX_UART1_BUFFLEN - MINIMUN_FRAME_SIZE; i++) {
+		if (start_index == (uint8_t) -1) {
+			if (rxBuffer[i] == (uint8_t) LTEL_START_MARK)
+				start_index = rxBuffer[i + 1] == MODULE_FUNCTION ? i : -1;
+			else
+				start_index = -1;
+		} else {
+			if (rxBuffer[i] == (uint8_t) LTEL_END_MARK) {
+				if (i > MINIMUN_FRAME_SIZE) {
+					uint16_t crc_rcv;
+					uint16_t crc_calc;
+					uint8_t data_start_index = start_index + 1;
+					crc_calc = crc_get(&(rxBuffer[data_start_index]),
+							i - data_start_index - 2);
+					crc_rcv = rxBuffer[i - 1] << 8 | rxBuffer[i - 2];
+					return crc_calc == crc_rcv ? start_index : -1;
+				}
+			}
+		}
+	}
+	return -1;
+}
+
+void ltel_set_parameter_frame(uint8_t *frame, struct Lna lna) {
+	uint8_t crc_frame[2];
+	uint16_t crc;
+	frame[0] = LTEL_START_MARK;
+	frame[1] = MODULE_FUNCTION;
+	frame[2] = MODULE_ADDR;
+	frame[3] = QUERY_PARAMETER_LTEL;
+	frame[4] = 0x00;
+	frame[5] = 0x05;
+	frame[6] = 0x00;
+	frame[7] = lna.attenuation;
+	frame[8] = lna.gain;
+	frame[9] = lna.pout;
+	frame[10] = lna.voltage;
+	crc = crc_get(&(frame[1]), 10);
+	memcpy(crc_frame, &crc, 2);
+	frame[11] = crc_frame[0];
+	frame[12] = crc_frame[1];
+	frame[13] = LTEL_END_MARK;
+}
+
+uint8_t get_db_gain(uint16_t adc_gain) {
+
+	if (adc_gain >= 3781)
+		return 45;
+	else if (adc_gain < 3781 && adc_gain >= 1515)
+		return 0.0022f * adc_gain + 36.6571f;
+	else if (adc_gain < 1515 && adc_gain >= 1188)
+		return (0.0153f * adc_gain + 16.8349f);
+	else if (adc_gain < 1188 && adc_gain >= 1005)
+		return (0.0273f * adc_gain + 2.540f);
+	else if (adc_gain < 1005 && adc_gain >= 897)
+		return (0.0463f * adc_gain - 16.5278f);
+	else if (adc_gain < 897 && adc_gain >= 825)
+		return (0.0694f * adc_gain - 37.2917f);
+	else if (adc_gain < 825 && adc_gain >= 776)
+		return (0.1020f * adc_gain - 64.1837f);
+	else if (adc_gain < 776 && adc_gain >= 746)
+		return (0.1667f * adc_gain - 114.333f);
+	else if (adc_gain < 746 && adc_gain >= 733)
+		return (0.3846f * adc_gain - 276.9231f);
+	else if (adc_gain < 733 && adc_gain >= 725)
+		return (0.625f * adc_gain - 453.125f);
+	else if (adc_gain < 725)
+		return 0;
+	return 0;
+}
+
+uint8_t get_dbm_pout(uint16_t pout_adc) {
+	uint16_t adc_max = 0;
+	uint16_t adc_min = 0;
+	float m, b;
+
+	do {
+		adc_max = EEPROM_2byte_Read(POUT_ADC_MAX_ADDR);
+		adc_min = EEPROM_2byte_Read(POUT_ADC_MIN_ADDR);
+	} while (adc_max == adc_min);
+
+	m = (POUT_DBM_MAX - POUT_DBM_MIN) / (float) (adc_max - adc_min);
+	b = POUT_DBM_MAX - adc_max * m;
+
+	if (pout_adc > adc_max) {
+		return POUT_DBM_MAX;
+	} else if (pout_adc < adc_min) {
+		return POUT_DBM_MIN;
+	}
+
+	return (int8_t) (m * (float) pout_adc + b);
+}
+
+struct Lna get_lna() {
+
+	struct Lna lna;
+	lna.pout = get_dbm_pout(adcResultsDMA[0]);
+	lna.current = ADC_CURRENT_FACTOR * adcResultsDMA[1] / 4096.0f;
+	lna.gain = get_db_gain(adcResultsDMA[2]);
+	lna.voltage = ADC_VOLTAGE_FACTOR * (float) adcResultsDMA[3];
+	lna.attenuation = EEPROM_Read(LNA_ATT_ADDR);
+	lna.pin = lna.pout - lna.gain + lna.attenuation;
+	return lna;
+}
+
+void set_attenuation(uint8_t attenuation, uint8_t times) {
+
+	if (attenuation < 0 || attenuation > 31) {
+		attenuation = 0;
+	}
+	attenuation *= 2;
+	for (uint8_t i = 0; i < times; i++) {
+		uint8_t mask = 0b00100000;
+		for (uint8_t j = 0; j < 6; j++) {
+			//Ciclo for de 6 vueltas para enviar los 6bits de configuración
+			if (mask & attenuation) {
+				//Si el bit de la mascara en 1 coincide con el bit del valor, entonces
+				HAL_GPIO_WritePin(GPIOA, DATA_ATTENUATOR_Pin, GPIO_PIN_SET); //Pin data en alto
+			} else {
+				HAL_GPIO_WritePin(GPIOA, DATA_ATTENUATOR_Pin, GPIO_PIN_RESET); //Pin data en bajo
+			}
+			HAL_GPIO_WritePin(GPIOA, CLK_ATTENUATOR_Pin, GPIO_PIN_SET); //Pin clock en alto
+			HAL_Delay(1); //Delay de 1mS
+			HAL_GPIO_WritePin(GPIOA, CLK_ATTENUATOR_Pin, GPIO_PIN_RESET); //Pin clock en bajo
+			mask = mask >> 1; //Muevo la máscara una posición
+		}
+		HAL_GPIO_WritePin(GPIOA, LE_ATTENUATOR_Pin, GPIO_PIN_SET); //Pin LE en alto
+		HAL_Delay(1);
+		HAL_GPIO_WritePin(GPIOA, LE_ATTENUATOR_Pin, GPIO_PIN_RESET); //Pin LE en bajo
+	}
+
+}
+
+void uart_send_frame(uint8_t *str, uint8_t len) {
+	HAL_GPIO_WritePin(GPIOA, DE_Pin, GPIO_PIN_SET);
+	HAL_UART_Transmit(&huart1, str, len, 100);
+	HAL_GPIO_WritePin(GPIOA, DE_Pin, GPIO_PIN_RESET);
+}
+
+void uart_send_str(uint8_t *str) {
+	uint8_t i;
+	for (i = 0; str[i] != '\0'; i++)
+		;
+	HAL_GPIO_WritePin(GPIOA, DE_Pin, GPIO_PIN_SET);
+	HAL_UART_Transmit(&huart1, str, i, 100);
+	HAL_GPIO_WritePin(GPIOA, DE_Pin, GPIO_PIN_RESET);
+}
+
+void uart_reset_reading(UART_HandleTypeDef *huart) {
+	huart->hdmarx->Instance->CCR &= ~DMA_CCR_EN; // disable
+	huart->hdmarx->Instance->CNDTR = RX_UART1_BUFFLEN; // reset counter
+	huart->hdmarx->Instance->CCR |= DMA_CCR_EN; // re-enable
+}
 
 /* USER CODE END 4 */
 
