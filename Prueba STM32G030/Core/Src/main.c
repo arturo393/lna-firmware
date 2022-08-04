@@ -112,9 +112,8 @@ uint16_t adc2_media;
 uint16_t adc3_media;
 uint8_t adc_counter = 0;
 
-uint16_t LED_STATE_TIMEOUT = 1000;
-uint8_t LED_ON_TIMEOUT = 50;
-bool IS_CONVERSION_COMPLETE = false;
+static const uint16_t LED_STATE_TIMEOUT = 1000;
+static const uint8_t  LED_ON_TIMEOUT = 50;
 uint32_t led_counter = 0;
 
 uint8_t uart_readed_bytes;
@@ -187,7 +186,7 @@ int main(void) {
 	MX_ADC1_Init();
 	MX_I2C1_Init();
 	MX_USART1_UART_Init();
-	//	MX_IWDG_Init();
+	MX_IWDG_Init();
 	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
@@ -195,8 +194,8 @@ int main(void) {
 	/* USER CODE BEGIN 2 */
 
 // Calibrate The ADC On Power-Up For Better Accuracy
-	//HAL_ADCEx_Calibration_Start(&hadc1);
-//	uart_send_str((uint8_t*) "LNA init\n\r");
+	HAL_ADCEx_Calibration_Start(&hadc1);
+	uart_send_str((uint8_t*) "LNA init\n\r");
 	set_attenuation(EEPROM_Read(LNA_ATT_ADDR), 3);
 
 	if (EEPROM_Read(POUT_ISCALIBRATED_ADDR) != POUT_ISCALIBRATED) {
@@ -210,10 +209,9 @@ int main(void) {
 	/* USER CODE BEGIN WHILE */
 
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
-	//HAL_UART_Receive_DMA (&huart1, &rxByte, 1);
-	//HAL_UART_Receive_DMA(&huart1, UART1_rxBuffer, RX_UART1_BUFFLEN);
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, &rxByte, 1);
 	__HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+
 	led_counter = HAL_GetTick();
 
 	while (1) {
@@ -300,7 +298,7 @@ int main(void) {
 				HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 			}
 		}
-		//	HAL_IWDG_Refresh(&hiwdg);
+		HAL_IWDG_Refresh(&hiwdg);
 
 	}   //Fin while
 	/* USER CODE END 3 */
