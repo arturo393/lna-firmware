@@ -140,11 +140,11 @@ static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 
-//uint8_t ltel_get_start_index(uint8_t *rxBuffer);
+
 void sigma_set_parameter_frame(uint8_t *frame, struct Lna lna);
 void ltel_set_parameter_frame(uint8_t *frame, struct Lna lna);
 uint8_t get_db_gain(uint16_t adc_gain);
-//uint8_t get_dbm_pout(uint16_t pout_adc);
+uint8_t get_dbm_pout(uint16_t pout_adc);
 struct Lna get_lna();
 void set_attenuation(uint8_t attenuation, uint8_t times);
 void uart_send_frame(uint8_t *str, uint8_t len);
@@ -213,6 +213,10 @@ int main(void) {
 	__HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
 
 	led_counter = HAL_GetTick();
+	uint8_t data[5] ={0x16, 0x09, 0x17, 0xC2,0xFE};
+	uint8_t crc ;
+	    crc = Crc8(data, 5);   /* returns 0x92 */
+
 
 	while (1) {
 
@@ -220,6 +224,7 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
+
 
 		if (isDataReady) {
 
@@ -241,14 +246,14 @@ int main(void) {
 				uart_send_frame(UART1_txBuffer, TX_UART1_BUFFLEN);
 			} else if (lna_cmd == SET_POUT_MAX) {
 
-				EEPROM_2byte_Write(POUT_ADC_MAX_ADDR, adcResultsDMA[0]);
+				EEPROM_2byte_Write(POUT_ADC_MAX_ADDR, adc0_media);
 				HAL_Delay(5);
 				EEPROM_Write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
 				uart_send_str((uint8_t*) "Saved Pout max value\n\r");
 
 			} else if (lna_cmd == SET_POUT_MIN) {
 
-				EEPROM_2byte_Write(POUT_ADC_MIN_ADDR, adcResultsDMA[0]);
+				EEPROM_2byte_Write(POUT_ADC_MIN_ADDR, adc0_media);
 				HAL_Delay(5);
 				EEPROM_Write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
 				uart_send_str((uint8_t*) "Saved Pout min value\n\r");
@@ -267,8 +272,8 @@ int main(void) {
 
 				sprintf(UART1_txBuffer,
 						"Pout %d  \t Gain %u \t Curent %d \t Voltage %d\r\n",
-						adcResultsDMA[0], adcResultsDMA[1], adcResultsDMA[2],
-						adcResultsDMA[3]);
+						adc0_media,adc1_media, adc2_media,
+						adc3_media);
 				uart_send_frame(UART1_txBuffer, TX_UART1_BUFFLEN);
 
 			} else if (lna_cmd == QUERY_PARAMETER_SIGMA) {
@@ -298,7 +303,7 @@ int main(void) {
 				HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 			}
 		}
-		HAL_IWDG_Refresh(&hiwdg);
+//		HAL_IWDG_Refresh(&hiwdg);
 
 	}   //Fin while
 	/* USER CODE END 3 */
@@ -331,6 +336,7 @@ void SystemClock_Config(void) {
 	RCC_OscInitStruct.PLL.PLLN = 16;
 	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
 	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+
 	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
 		Error_Handler();
 	}
@@ -777,6 +783,8 @@ void adc_media_calc() {
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size) {
+
+
 
 	if (isDataReady == false) {
 		if (rcvcount == 0 && rxByte == LTEL_START_MARK) {
