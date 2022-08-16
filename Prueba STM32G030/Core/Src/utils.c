@@ -18,8 +18,6 @@ uint16_t crc_get(uint8_t* buffer, uint8_t buff_len) {
 	return crc;
 }
 
-
-
 bool crc_check(uint8_t *frame, uint8_t len, uint8_t *crc_frame) {
 	uint16_t crc;
 	uint8_t testframe[2];
@@ -30,3 +28,21 @@ bool crc_check(uint8_t *frame, uint8_t len, uint8_t *crc_frame) {
 	}
 	return false;
 }
+
+
+uint8_t Crc8(const void* vptr, int len) {
+  const uint8_t *data = vptr;
+  unsigned crc = 0;
+  int i, j;
+  for (j = len; j; j--, data++) {
+    crc ^= (*data << 8);
+    for(i = 8; i; i--) {
+      if (crc & 0x8000)
+        crc ^= (0x1070 << 3);
+      crc <<= 1;
+    }
+  }
+  return (uint8_t)(crc >> 8);
+}
+
+
