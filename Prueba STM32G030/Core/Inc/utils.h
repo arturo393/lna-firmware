@@ -27,6 +27,7 @@
 /* USER CODE BEGIN Prototypes */
 uint16_t crc_get(uint8_t buffer[], uint8_t buff_len);
 bool crc_check(uint8_t *frame, uint8_t len, uint8_t *crc_frame);
+uint8_t gencrc(uint8_t *data, size_t len);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus
