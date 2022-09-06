@@ -7,7 +7,6 @@
 *.o
 *.ko
 *.obj
-*.elf
 
 # Linker output
 *.ilk
@@ -65,3 +64,14 @@ ctrlp.root
 
 #html
 *.html
+
+*.cproject*
+.mxproject*
+.cproject
+.project
+.settings/
+
+object.list*
+
+
+Prueba STM32G030/Drivers/*
