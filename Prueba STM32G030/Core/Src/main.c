@@ -92,8 +92,6 @@ static uint8_t POUT_ISCALIBRATED_ADDR = 0x07;
 
 static uint8_t POUT_ISCALIBRATED = 0xAA;
 
-
-
 struct Lna {
 	uint8_t attenuation;
 	uint8_t gain;
@@ -114,7 +112,10 @@ uint16_t adc2_media;
 uint16_t adc3_media;
 uint8_t adc_counter = 0;
 
-bool IS_CONVERSION_COMPLETE = false;
+static const uint16_t LED_STATE_TIMEOUT = 1000;
+static const uint8_t  LED_ON_TIMEOUT = 50;
+uint32_t led_counter = 0;
+
 uint8_t uart_readed_bytes;
 uint8_t UART1_rxBuffer[RX_UART1_BUFFLEN] = { 0 };
 uint8_t UART1_txBuffer[TX_UART1_BUFFLEN] = { 0 };
@@ -126,7 +127,6 @@ bool isLnaAddr = false;
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size);
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc);
-
 
 /* USER CODE END PV */
 
@@ -140,7 +140,7 @@ static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 
-//uint8_t ltel_get_start_index(uint8_t *rxBuffer);
+
 void sigma_set_parameter_frame(uint8_t *frame, struct Lna lna);
 void ltel_set_parameter_frame(uint8_t *frame, struct Lna lna);
 uint8_t get_db_gain(uint16_t adc_gain);
@@ -149,7 +149,7 @@ struct Lna get_lna();
 void set_attenuation(uint8_t attenuation, uint8_t times);
 void uart_send_frame(uint8_t *str, uint8_t len);
 void uart_send_str(uint8_t *str);
-
+void adc_media_calc();
 
 //void uart_reset_reading(UART_HandleTypeDef *huart);
 /* USER CODE END PFP */
@@ -194,7 +194,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
 // Calibrate The ADC On Power-Up For Better Accuracy
-	//HAL_ADCEx_Calibration_Start(&hadc1);
+	HAL_ADCEx_Calibration_Start(&hadc1);
 	uart_send_str((uint8_t*) "LNA init\n\r");
 	set_attenuation(EEPROM_Read(LNA_ATT_ADDR), 3);
 
@@ -209,10 +209,14 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
-	//HAL_UART_Receive_DMA (&huart1, &rxByte, 1);
-	//HAL_UART_Receive_DMA(&huart1, UART1_rxBuffer, RX_UART1_BUFFLEN);
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, &rxByte, 1);
 	__HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
+
+	led_counter = HAL_GetTick();
+	uint8_t data[5] ={0x16, 0x09, 0x17, 0xC2,0xFE};
+	uint8_t crc ;
+	    crc = Crc8(data, 5);   /* returns 0x92 */
+
 
 	while (1) {
 
@@ -220,6 +224,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
 
 		if (isDataReady) {
 
@@ -241,14 +246,14 @@ int main(void)
 				uart_send_frame(UART1_txBuffer, TX_UART1_BUFFLEN);
 			} else if (lna_cmd == SET_POUT_MAX) {
 
-				EEPROM_2byte_Write(POUT_ADC_MAX_ADDR, adcResultsDMA[0]);
+				EEPROM_2byte_Write(POUT_ADC_MAX_ADDR, adc0_media);
 				HAL_Delay(5);
 				EEPROM_Write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
 				uart_send_str((uint8_t*) "Saved Pout max value\n\r");
 
 			} else if (lna_cmd == SET_POUT_MIN) {
 
-				EEPROM_2byte_Write(POUT_ADC_MIN_ADDR, adcResultsDMA[0]);
+				EEPROM_2byte_Write(POUT_ADC_MIN_ADDR, adc0_media);
 				HAL_Delay(5);
 				EEPROM_Write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
 				uart_send_str((uint8_t*) "Saved Pout min value\n\r");
@@ -264,12 +269,11 @@ int main(void)
 				uart_send_frame(UART1_txBuffer, TX_UART1_BUFFLEN);
 
 			} else if (lna_cmd == QUERY_ADC) {
-
-
+				adc_media_calc();
 				sprintf(UART1_txBuffer,
 						"Pout %d  \t Gain %u \t Curent %d \t Voltage %d\r\n",
-						adcResultsDMA[0], adcResultsDMA[1], adcResultsDMA[2],
-						adcResultsDMA[3]);
+						adc0_media,adc1_media, adc2_media,
+						adc3_media);
 				uart_send_frame(UART1_txBuffer, TX_UART1_BUFFLEN);
 
 			} else if (lna_cmd == QUERY_PARAMETER_SIGMA) {
@@ -288,7 +292,19 @@ int main(void)
 			}
 
 		}
+
+
+		if (HAL_GetTick() - led_counter > LED_STATE_TIMEOUT) {
+			led_counter = HAL_GetTick();
+		} else {
+			if (HAL_GetTick() - led_counter > LED_ON_TIMEOUT) {
+				HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+			} else {
+				HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+			}
+		}
 		HAL_IWDG_Refresh(&hiwdg);
+
 	}   //Fin while
   /* USER CODE END 3 */
 }
@@ -441,7 +457,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x00602173;
+  hi2c1.Init.Timing = 0x10707DBC;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
@@ -709,10 +725,11 @@ uint8_t get_dbm_pout(uint16_t pout_adc) {
 struct Lna get_lna() {
 
 	struct Lna lna;
-	lna.pout = get_dbm_pout(adcResultsDMA[0]);
-	lna.current = ADC_CURRENT_FACTOR * adcResultsDMA[1] / 4096.0f;
-	lna.gain = get_db_gain(adcResultsDMA[2]);
-	lna.voltage = ADC_VOLTAGE_FACTOR * (float) adcResultsDMA[3];
+	adc_media_calc();
+	lna.pout = get_dbm_pout(adc0_media);
+	lna.current = ADC_CURRENT_FACTOR * adc1_media / 4096.0f;
+	lna.gain = get_db_gain(adc2_media);
+	lna.voltage = ADC_VOLTAGE_FACTOR * (float) adc3_media;
 	lna.attenuation = EEPROM_Read(LNA_ATT_ADDR);
 	lna.pin = lna.pout - lna.gain + lna.attenuation;
 	return lna;
@@ -761,7 +778,27 @@ void uart_send_str(uint8_t *str) {
 	HAL_GPIO_WritePin(GPIOA, DE_Pin, GPIO_PIN_RESET);
 }
 
+void adc_media_calc() {
+	uint32_t sum0 = 0;
+	uint32_t sum1 = 0;
+	uint32_t sum2 = 0;
+	uint32_t sum3 = 0;
+
+	for (int i = 0; i < MEDIA_NUM; i++) {
+		sum0 += adcResultsDMA[0];
+		sum1 += adcResultsDMA[1];
+		sum2 += adcResultsDMA[2];
+		sum3 += adcResultsDMA[3];
+	}
+	adc0_media = sum0 / MEDIA_NUM;
+	adc1_media = sum1 / MEDIA_NUM;
+	adc2_media = sum2 / MEDIA_NUM;
+	adc3_media = sum3 / MEDIA_NUM;
+}
+
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size) {
+
+
 
 	if (isDataReady == false) {
 		if (rcvcount == 0 && rxByte == LTEL_START_MARK) {
@@ -799,7 +836,6 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size) {
 
 }
 
-
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 
 	if (adc_counter < MEDIA_NUM) {
@@ -808,25 +844,14 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 		adc2_values[adc_counter] = adcResultsDMA[2];
 		adc3_values[adc_counter] = adcResultsDMA[3];
 		adc_counter++;
+
 	} else {
-		uint32_t sum0 = 0;
-		uint32_t sum1 = 0;
-		uint32_t sum2 = 0;
-		uint32_t sum3 = 0;
-		for (int i = 0; i < MEDIA_NUM; i++) {
-			sum0 += adcResultsDMA[0];
-			sum1 += adcResultsDMA[1];
-			sum2 += adcResultsDMA[2];
-			sum3 += adcResultsDMA[3];
-		}
-		adc0_media = sum0 / MEDIA_NUM;
-		adc1_media = sum1 / MEDIA_NUM;
-		adc2_media = sum2 / MEDIA_NUM;
-		adc3_media = sum3 / MEDIA_NUM;
+		adc_counter = 0;
+
 	}
 
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
-	IS_CONVERSION_COMPLETE = true;
+
 }
 /* USER CODE END 4 */
 
