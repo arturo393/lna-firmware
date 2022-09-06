@@ -191,6 +191,7 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
+
   /* USER CODE BEGIN 2 */
 
 // Calibrate The ADC On Power-Up For Better Accuracy
@@ -507,7 +508,7 @@ static void MX_IWDG_Init(void)
   hiwdg.Instance = IWDG;
   hiwdg.Init.Prescaler = IWDG_PRESCALER_16;
   hiwdg.Init.Window = 4095;
-  hiwdg.Init.Reload = 2000;
+  hiwdg.Init.Reload = 2001;
   if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
   {
     Error_Handler();
