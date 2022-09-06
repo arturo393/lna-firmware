@@ -71,10 +71,6 @@ void Error_Handler(void);
 #define Volt_Volt_GPIO_Port GPIOA
 #define AGC_Volt_Pin GPIO_PIN_0
 #define AGC_Volt_GPIO_Port GPIOB
-#define LED_Pin GPIO_PIN_1
-#define LED_GPIO_Port GPIOB
-#define DE_Pin GPIO_PIN_15
-#define DE_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

@@ -21,6 +21,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "i2c1.h"
 
 
 /* Private includes ----------------------------------------------------------*/
@@ -48,6 +49,12 @@ uint8_t EEPROM_Read(uint8_t address);
 void EEPROM_Write(uint8_t address, uint8_t data);
 void EEPROM_2byte_Write(uint8_t addr, uint16_t data);
 uint16_t EEPROM_2byte_Read(uint8_t address);
+
+void eeprom_2byte_write(uint8_t addr, uint16_t data);
+uint16_t eeprom_2byte_read(uint8_t address);
+uint8_t eeprom_1byte_read(uint8_t eaddress);
+void eeprom_1byte_write(uint8_t address, uint8_t data);
+
 
 /* USER CODE BEGIN EFP */
 
