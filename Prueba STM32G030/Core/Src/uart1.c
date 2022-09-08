@@ -53,12 +53,18 @@ void uart1_init(uint32_t pclk, uint32_t baud_rate) {
 
 	/*enable clock access to USART1 */
 	SET_BIT(RCC->APBENR2, RCC_APBENR2_USART1EN);
-//	MODIFY_REG(USART1->PRESC,USART_PRESC_PRESCALER,0x0010);
+	if(pclk == 16000000){
+	/*set HSI 16 CLK */
+	CLEAR_BIT(RCC->CCIPR,RCC_CCIPR_USART1SEL_0);
+	SET_BIT(RCC->CCIPR,RCC_CCIPR_USART1SEL_1);
+	}
+	//MODIFY_REG(USART1->PRESC,USART_PRESC_PRESCALER,0x0010);
 	/* set baud rate */
 	br_value = (pclk) / baud_rate;
 	USART1->BRR = (uint16_t) br_value;
 	/* transmitter enable*/
 	USART1->CR1 = USART_CR1_TE | USART_CR1_RE;
+
 	/* enable FIFO */
 	//SET_BIT(USART1->CR2, USART_CR1_FIFOEN);
 	/* enable Rx timeout */
