@@ -80,8 +80,8 @@ char i2c1_byteReceive(char saddr, uint8_t N) {
 	while (!(READ_BIT(I2C1->ISR, I2C_ISR_STOPF)
 			| READ_BIT(I2C1->ISR, I2C_ISR_NACKF))) {
 	}
-	ATOMIC_SET_BIT(I2C1->ISR, I2C_ICR_STOPCF);
-	ATOMIC_SET_BIT(I2C1->ISR, I2C_ICR_NACKCF);
+	SET_BIT(I2C1->ISR, I2C_ICR_STOPCF);
+	SET_BIT(I2C1->ISR, I2C_ICR_NACKCF);
 
 	return data;
 }
@@ -93,12 +93,12 @@ void i2c1_byteTransmit(char saddr, char *data, uint8_t N) {
 		while (!READ_BIT(I2C1->ISR, I2C_ISR_TXIS)
 				& !READ_BIT(I2C1->ISR, I2C_ISR_NACKF)) {
 		}
-		ATOMIC_MODIFY_REG(I2C1->TXDR, I2C_TXDR_TXDATA, data[i]);
+		MODIFY_REG(I2C1->TXDR, I2C_TXDR_TXDATA, data[i]);
 	}
 
 	while (!READ_BIT(I2C1->ISR, I2C_ISR_STOPF)) {
 	}
-	ATOMIC_SET_BIT(I2C1->ISR, I2C_ICR_STOPCF);
+	SET_BIT(I2C1->ISR, I2C_ICR_STOPCF);
 
 }
 

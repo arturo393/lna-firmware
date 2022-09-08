@@ -51,21 +51,18 @@ DMA_HandleTypeDef hdma_adc1;
 
 IWDG_HandleTypeDef hiwdg;
 
-UART_HandleTypeDef huart1;
-
 /* USER CODE BEGIN PV */
 #define SYS_FREQ 64000000
 #define APB_FREQ SYS_FREQ
-#define PB1   (1U<<0)
-#define PA15  (1U<<15)
-
+#define HS16_CLK 16000000
+#define BAUD_RATE 115200
 #define LED_PIN PB1
 #define DE_PIN PA15
 
-#define led_off() ATOMIC_CLEAR_BIT(GPIOB->ODR,GPIO_ODR_OD1)
-#define led_on() ATOMIC_SET_BIT(GPIOB->ODR,GPIO_ODR_OD1)
+#define led_off() CLEAR_BIT(GPIOB->ODR,GPIO_ODR_OD1)
+#define led_on() SET_BIT(GPIOB->ODR,GPIO_ODR_OD1)
 
-#define RX_UART1_BUFFLEN  30
+#define RX_UART1_BUFFLEN  25
 #define TX_UART1_BUFFLEN  100
 #define LTEL_FRAME_SIZE 14
 #define SIGMA_FRAME_SIZE 14
@@ -95,7 +92,6 @@ static const uint16_t POUT_ADC_MAX = 1833;
 static const uint16_t POUT_ADC_MIN = 488;
 
 static uint8_t LNA_ATT_ADDR = 0x00;
-
 static uint8_t POUT_ADC_MAX_ADDR = 0x03;
 static uint8_t POUT_ADC_MIN_ADDR = 0x05;
 static uint8_t POUT_ISCALIBRATED_ADDR = 0x07;
@@ -109,7 +105,6 @@ struct Lna {
 	uint8_t current;
 	int8_t pin;
 	float voltage;
-	uint8_t *p;
 };
 
 volatile uint16_t adcResultsDMA[4];
@@ -123,25 +118,16 @@ uint16_t adc2_media;
 uint16_t adc3_media;
 uint8_t adc_counter = 0;
 
+bool adcDataReady = false;
+
 static const uint16_t LED_STATE_TIMEOUT = 1000;
 static const uint8_t LED_ON_TIMEOUT = 50;
 uint32_t led_counter = 0;
 
-uint8_t uart_readed_bytes;
 volatile uint8_t UART1_rxBuffer[RX_UART1_BUFFLEN] = { 0 };
 uint8_t UART1_txBuffer[TX_UART1_BUFFLEN] = { 0 };
-
-uint8_t rcvcount = 0;
 bool isDataReady = false;
-bool isUARTRx = false;
-uint32_t irccounter = 0;
-uint32_t rxfne = 0;
-bool isLnaModule = false;
-bool isLnaAddr = false;
-bool rxdata;
-uint8_t tx_byte = 0;
 
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size);
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc);
 
 /* USER CODE END PV */
@@ -151,12 +137,14 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_DMA_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 
 void sigma_set_parameter_frame(uint8_t *frame, struct Lna lna);
 void ltel_set_parameter_frame(uint8_t *frame, struct Lna lna);
+void lna_cmd_action();
+void lna_uart_read();
+bool lna_check_valid_str();
 uint8_t get_db_gain(uint16_t adc_gain);
 uint8_t get_dbm_pout(uint16_t pout_adc);
 struct Lna get_lna();
@@ -172,21 +160,20 @@ void adc_media_calc();
 /* USER CODE END 0 */
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
-int main(void)
-{
-  /* USER CODE BEGIN 1 */
+ * @brief  The application entry point.
+ * @retval int
+ */
+int main(void) {
+	/* USER CODE BEGIN 1 */
 	//__disable_irq();
-  /* USER CODE END 1 */
+	/* USER CODE END 1 */
 
-  /* MCU Configuration--------------------------------------------------------*/
+	/* MCU Configuration--------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+	HAL_Init();
 
-  /* USER CODE BEGIN Init */
+	/* USER CODE BEGIN Init */
 
 	/* enable clock access ro GPIOA and GPIOB */
 	SET_BIT(RCC->IOPENR, RCC_IOPENR_GPIOAEN);
@@ -200,25 +187,25 @@ int main(void)
 	SET_BIT(GPIOB->MODER, GPIO_MODER_MODE1_0);
 	CLEAR_BIT(GPIOB->MODER, GPIO_MODER_MODE1_1);
 
-	uart1_init(APB_FREQ, 115200);
+	/* USER CODE END Init */
 
-  /* USER CODE END Init */
+	/* Configure the system clock */
+	SystemClock_Config();
 
-  /* Configure the system clock */
-  SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
+	/* USER CODE BEGIN SysInit */
 	MX_DMA_Init();
 	MX_ADC1_Init();
-	  MX_IWDG_Init();
-  /* USER CODE END SysInit */
+//	MX_IWDG_Init();
 
-  /* Initialize all configured peripherals */
+	i2c1_init();
+	uart1_init(HS16_CLK, BAUD_RATE);
+	/* USER CODE END SysInit */
 
-  /* USER CODE BEGIN 2 */
+	/* Initialize all configured peripherals */
+
+	/* USER CODE BEGIN 2 */
 
 // Calibrate The ADC On Power-Up For Better Accuracy
-	i2c1_init();
 	HAL_ADCEx_Calibration_Start(&hadc1);
 	uart1_send_str("LNA init\n\r");
 	set_attenuation(eeprom_1byte_read(LNA_ATT_ADDR), 3);
@@ -228,72 +215,22 @@ int main(void)
 		eeprom_2byte_write(POUT_ADC_MAX_ADDR, POUT_ADC_MAX);
 	}
 
-  /* USER CODE END 2 */
+	/* USER CODE END 2 */
 
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
+	/* Infinite loop */
+	/* USER CODE BEGIN WHILE */
 
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
 	led_counter = HAL_GetTick();
 	while (1) {
 
 //Fin function 1 second
-    /* USER CODE END WHILE */
+		/* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+		/* USER CODE BEGIN 3 */
 
 		if (isDataReady) {
-
-			uint8_t lna_cmd = UART1_rxBuffer[3];
-			if (lna_cmd == QUERY_PARAMETER_LTEL) {
-				struct Lna lna;
-				uint8_t frame[14];
-				lna = get_lna();
-				ltel_set_parameter_frame(frame, lna);
-				uart1_send_frame((char*) frame, 14);
-			} else if (lna_cmd == SET_ATT_LTEL) {
-				uint8_t attenuation_value = UART1_rxBuffer[6];
-				set_attenuation(attenuation_value, 3);
-				eeprom_1byte_write(LNA_ATT_ADDR, attenuation_value);
-				sprintf(UART1_txBuffer, "Attenuation %u\r\n",
-						attenuation_value);
-				uart1_send_frame((char*) UART1_txBuffer, TX_UART1_BUFFLEN);
-			} else if (lna_cmd == SET_POUT_MAX) {
-				eeprom_2byte_write(POUT_ADC_MAX_ADDR, adc0_media);
-				HAL_Delay(5);
-				eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
-				uart1_send_str("Saved Pout max value\n\r");
-
-			} else if (lna_cmd == SET_POUT_MIN) {
-				eeprom_2byte_write(POUT_ADC_MIN_ADDR, adc0_media);
-				HAL_Delay(5);
-				eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
-				uart1_send_str("Saved Pout min value\n\r");
-
-			} else if (lna_cmd == QUERY_PARAMETER_STR) {
-				struct Lna lna;
-				lna = get_lna();
-				sprintf(UART1_txBuffer,
-						"Pout %d[dBm] Att %u[dB] Gain %u[dB] Pin %d[dBm] Curent %d[mA] Voltage %u[V]\r\n",
-						lna.pout, lna.attenuation, lna.gain, lna.pin,
-						lna.current, (uint8_t) lna.voltage);
-				uart1_send_frame((char*) UART1_txBuffer, TX_UART1_BUFFLEN);
-
-			} else if (lna_cmd == QUERY_ADC) {
-				char frame[100];
-				sprintf(UART1_txBuffer,
-						"Pout %d  \t Gain %u \t Curent %u \t Voltage %u\r\n",
-						adc0_media, adc1_media, adc2_media, adc3_media);
-				uart1_send_frame((char*) UART1_txBuffer, TX_UART1_BUFFLEN);
-
-			} else if (lna_cmd == QUERY_PARAMETER_SIGMA) {
-				struct Lna lna;
-				uint8_t frame[LTEL_FRAME_SIZE];
-				lna = get_lna();
-				sigma_set_parameter_frame(frame, lna);
-				uart1_send_frame((char*) frame, LTEL_FRAME_SIZE);
-			}
-
+			lna_cmd_action();
 			isDataReady = false;
 			for (int i = 0; i < TX_UART1_BUFFLEN; i++) {
 				if (i < RX_UART1_BUFFLEN)
@@ -303,36 +240,8 @@ int main(void)
 		}
 
 		if (isDataReady == false) {
-			uint8_t rcvcount = 0;
-			uint32_t tickstart = HAL_GetTick();
-			bool timeout = false;
-			uint8_t timeout_value = 10;
-
-			while (rcvcount < RX_UART1_BUFFLEN && timeout == false) {
-				if (((HAL_GetTick() - tickstart) > timeout_value)
-						|| (timeout_value == 0U)) {
-					timeout = true;
-					if (READ_BIT(USART1->ISR, USART_ISR_ORE))
-						SET_BIT(USART1->ICR, USART_ICR_ORECF);
-					if (READ_BIT(USART1->ISR, USART_ISR_IDLE))
-						SET_BIT(USART1->ICR, USART_ICR_IDLECF);
-					if (READ_BIT(USART1->ISR, USART_ISR_FE))
-						SET_BIT(USART1->ICR, USART_ICR_FECF);
-				}
-
-				if (READ_BIT(USART1->ISR, USART_ISR_RXNE_RXFNE))
-					UART1_rxBuffer[rcvcount++] = USART1->RDR;
-			}
-
-			if (UART1_rxBuffer[0] == LTEL_START_MARK)
-				if (UART1_rxBuffer[1] == MODULE_FUNCTION)
-					if (UART1_rxBuffer[2] == MODULE_ADDR)
-						for (int i = 3;
-								i < RX_UART1_BUFFLEN && isDataReady == false;
-								i++)
-							isDataReady =
-									UART1_rxBuffer[i] == LTEL_END_MARK ?
-											true : false;
+			lna_uart_read();
+			isDataReady = lna_check_valid_str();
 		}
 
 		if (HAL_GetTick() - led_counter > LED_STATE_TIMEOUT) {
@@ -344,276 +253,230 @@ int main(void)
 			} else {
 				led_on();
 			}
-			HAL_IWDG_Refresh(&hiwdg);
 
+			if (adcDataReady) {
+				if (adc_counter < MEDIA_NUM) {
+					adc0_values[adc_counter] = adcResultsDMA[0];
+					adc1_values[adc_counter] = adcResultsDMA[1];
+					adc2_values[adc_counter] = adcResultsDMA[2];
+					adc3_values[adc_counter] = adcResultsDMA[3];
+					adc_counter++;
+
+				} else {
+					adc_counter = 0;
+
+				}
+				adcDataReady = false;
+			}
+			//HAL_IWDG_Refresh(&hiwdg);
 		}
 	}   //Fin while
-  /* USER CODE END 3 */
+	/* USER CODE END 3 */
 }
 
 /**
-  * @brief System Clock Configuration
-  * @retval None
-  */
-void SystemClock_Config(void)
-{
-  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+ * @brief System Clock Configuration
+ * @retval None
+ */
+void SystemClock_Config(void) {
+	RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
+	RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
 
-  /** Configure the main internal regulator output voltage
-  */
-  HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
+	/** Configure the main internal regulator output voltage
+	 */
+	HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-  /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSIDiv = RCC_HSI_DIV1;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV1;
-  RCC_OscInitStruct.PLL.PLLN = 8;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** Initializes the RCC Oscillators according to the specified parameters
+	 * in the RCC_OscInitTypeDef structure.
+	 */
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI
+			| RCC_OSCILLATORTYPE_LSI;
+	RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+	RCC_OscInitStruct.HSIDiv = RCC_HSI_DIV1;
+	RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+	RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+	RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV1;
+	RCC_OscInitStruct.PLL.PLLN = 8;
+	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+	/** Initializes the CPU, AHB and APB buses clocks
+	 */
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+			| RCC_CLOCKTYPE_PCLK1;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
+		Error_Handler();
+	}
 }
 
 /**
-  * @brief ADC1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_ADC1_Init(void)
-{
+ * @brief ADC1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_ADC1_Init(void) {
 
-  /* USER CODE BEGIN ADC1_Init 0 */
+	/* USER CODE BEGIN ADC1_Init 0 */
 
-  /* USER CODE END ADC1_Init 0 */
+	/* USER CODE END ADC1_Init 0 */
 
-  ADC_ChannelConfTypeDef sConfig = {0};
+	ADC_ChannelConfTypeDef sConfig = { 0 };
 
-  /* USER CODE BEGIN ADC1_Init 1 */
+	/* USER CODE BEGIN ADC1_Init 1 */
 
-  /* USER CODE END ADC1_Init 1 */
+	/* USER CODE END ADC1_Init 1 */
 
-  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
-  */
-  hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
-  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
-  hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.LowPowerAutoPowerOff = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.NbrOfConversion = 4;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.DMAContinuousRequests = ENABLE;
-  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
-  hadc1.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_12CYCLES_5;
-  hadc1.Init.SamplingTimeCommon2 = ADC_SAMPLETIME_12CYCLES_5;
-  hadc1.Init.OversamplingMode = DISABLE;
-  hadc1.Init.TriggerFrequencyMode = ADC_TRIGGER_FREQ_HIGH;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+	 */
+	hadc1.Instance = ADC1;
+	hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+	hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+	hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+	hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
+	hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
+	hadc1.Init.LowPowerAutoWait = DISABLE;
+	hadc1.Init.LowPowerAutoPowerOff = DISABLE;
+	hadc1.Init.ContinuousConvMode = DISABLE;
+	hadc1.Init.NbrOfConversion = 4;
+	hadc1.Init.DiscontinuousConvMode = DISABLE;
+	hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+	hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+	hadc1.Init.DMAContinuousRequests = ENABLE;
+	hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+	hadc1.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_12CYCLES_5;
+	hadc1.Init.SamplingTimeCommon2 = ADC_SAMPLETIME_12CYCLES_5;
+	hadc1.Init.OversamplingMode = DISABLE;
+	hadc1.Init.TriggerFrequencyMode = ADC_TRIGGER_FREQ_HIGH;
+	if (HAL_ADC_Init(&hadc1) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_0;
-  sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** Configure Regular Channel
+	 */
+	sConfig.Channel = ADC_CHANNEL_0;
+	sConfig.Rank = ADC_REGULAR_RANK_1;
+	sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_6;
-  sConfig.Rank = ADC_REGULAR_RANK_2;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** Configure Regular Channel
+	 */
+	sConfig.Channel = ADC_CHANNEL_6;
+	sConfig.Rank = ADC_REGULAR_RANK_2;
+	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_8;
-  sConfig.Rank = ADC_REGULAR_RANK_3;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
+	/** Configure Regular Channel
+	 */
+	sConfig.Channel = ADC_CHANNEL_8;
+	sConfig.Rank = ADC_REGULAR_RANK_3;
+	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+		Error_Handler();
+	}
 
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_7;
-  sConfig.Rank = ADC_REGULAR_RANK_4;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN ADC1_Init 2 */
+	/** Configure Regular Channel
+	 */
+	sConfig.Channel = ADC_CHANNEL_7;
+	sConfig.Rank = ADC_REGULAR_RANK_4;
+	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN ADC1_Init 2 */
 
-  /* USER CODE END ADC1_Init 2 */
+	/* USER CODE END ADC1_Init 2 */
 
 }
 
 /**
-  * @brief IWDG Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_IWDG_Init(void)
-{
+ * @brief IWDG Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_IWDG_Init(void) {
 
-  /* USER CODE BEGIN IWDG_Init 0 */
+	/* USER CODE BEGIN IWDG_Init 0 */
 
-  /* USER CODE END IWDG_Init 0 */
+	/* USER CODE END IWDG_Init 0 */
 
-  /* USER CODE BEGIN IWDG_Init 1 */
+	/* USER CODE BEGIN IWDG_Init 1 */
 
-  /* USER CODE END IWDG_Init 1 */
-  hiwdg.Instance = IWDG;
-  hiwdg.Init.Prescaler = IWDG_PRESCALER_16;
-  hiwdg.Init.Window = 4095;
-  hiwdg.Init.Reload = 2000;
-  if (HAL_IWDG_Init(&hiwdg) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN IWDG_Init 2 */
+	/* USER CODE END IWDG_Init 1 */
+	hiwdg.Instance = IWDG;
+	hiwdg.Init.Prescaler = IWDG_PRESCALER_16;
+	hiwdg.Init.Window = 4095;
+	hiwdg.Init.Reload = 2000;
+	if (HAL_IWDG_Init(&hiwdg) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN IWDG_Init 2 */
 
-  /* USER CODE END IWDG_Init 2 */
+	/* USER CODE END IWDG_Init 2 */
+
+}
+
+static void MX_DMA_Init(void) {
+
+	/* DMA controller clock enable */
+	__HAL_RCC_DMA1_CLK_ENABLE();
+
+	/* DMA interrupt init */
+	/* DMA1_Channel2_3_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
 
 }
 
 /**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
+ * @brief GPIO Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_GPIO_Init(void) {
+	GPIO_InitTypeDef GPIO_InitStruct = { 0 };
 
-  /* USER CODE BEGIN USART1_Init 0 */
+	/* GPIO Ports Clock Enable */
+	__HAL_RCC_GPIOA_CLK_ENABLE();
+	__HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /* USER CODE END USART1_Init 0 */
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(GPIOA,
+	LE_ATTENUATOR_Pin | CLK_ATTENUATOR_Pin | DATA_ATTENUATOR_Pin,
+			GPIO_PIN_RESET);
 
-  /* USER CODE BEGIN USART1_Init 1 */
+	/*Configure GPIO pins : LE_ATTENUATOR_Pin CLK_ATTENUATOR_Pin DATA_ATTENUATOR_Pin */
+	GPIO_InitStruct.Pin = LE_ATTENUATOR_Pin | CLK_ATTENUATOR_Pin
+			| DATA_ATTENUATOR_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
+	/*Configure GPIO pins : PA2 PA3 */
+	GPIO_InitStruct.Pin = GPIO_PIN_2 | GPIO_PIN_3;
+	GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	GPIO_InitStruct.Alternate = GPIO_AF1_USART2;
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /* USER CODE END USART1_Init 2 */
-
-}
-
-/**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Channel2_3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
-
-}
-
-/**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_GPIO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LE_ATTENUATOR_Pin|CLK_ATTENUATOR_Pin|DATA_ATTENUATOR_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pins : LE_ATTENUATOR_Pin CLK_ATTENUATOR_Pin DATA_ATTENUATOR_Pin */
-  GPIO_InitStruct.Pin = LE_ATTENUATOR_Pin|CLK_ATTENUATOR_Pin|DATA_ATTENUATOR_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PA2 PA3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF1_USART2;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PB6 PB7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF6_I2C1;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	/*Configure GPIO pins : PB6 PB7 */
+	GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
+	GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	GPIO_InitStruct.Alternate = GPIO_AF6_I2C1;
+	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 
@@ -724,6 +587,94 @@ struct Lna get_lna() {
 	return lna;
 }
 
+void lna_cmd_action() {
+	uint8_t lna_cmd = UART1_rxBuffer[3];
+	if (lna_cmd == QUERY_PARAMETER_LTEL) {
+		struct Lna lna;
+		uint8_t frame[14];
+		lna = get_lna();
+		ltel_set_parameter_frame(frame, lna);
+		uart1_send_frame((char*) frame, 14);
+	} else if (lna_cmd == SET_ATT_LTEL) {
+		uint8_t attenuation_value = UART1_rxBuffer[6];
+		set_attenuation(attenuation_value, 3);
+		eeprom_1byte_write(LNA_ATT_ADDR, attenuation_value);
+		sprintf(UART1_txBuffer, "Attenuation %u\r\n", attenuation_value);
+		uart1_send_frame((char*) UART1_txBuffer, TX_UART1_BUFFLEN);
+	} else if (lna_cmd == SET_POUT_MAX) {
+		eeprom_2byte_write(POUT_ADC_MAX_ADDR, adc0_media);
+		HAL_Delay(5);
+		eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
+		uart1_send_str("Saved Pout max value\n\r");
+
+	} else if (lna_cmd == SET_POUT_MIN) {
+		eeprom_2byte_write(POUT_ADC_MIN_ADDR, adc0_media);
+		HAL_Delay(5);
+		eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
+		uart1_send_str("Saved Pout min value\n\r");
+
+	} else if (lna_cmd == QUERY_PARAMETER_STR) {
+		struct Lna lna;
+		lna = get_lna();
+		sprintf(UART1_txBuffer,
+				"Pout %d[dBm] Att %u[dB] Gain %u[dB] Pin %d[dBm] Curent %d[mA] Voltage %u[V]\r\n",
+				lna.pout, lna.attenuation, lna.gain, lna.pin, lna.current,
+				(uint8_t) lna.voltage);
+		uart1_send_frame((char*) UART1_txBuffer, TX_UART1_BUFFLEN);
+
+	} else if (lna_cmd == QUERY_ADC) {
+		adc_media_calc();
+		sprintf(UART1_txBuffer,
+				"Pout %d  \t Gain %u \t Curent %u \t Voltage %u\r\n",
+				adc0_media, adc1_media, adc2_media, adc3_media);
+		uart1_send_frame((char*) UART1_txBuffer, TX_UART1_BUFFLEN);
+
+	} else if (lna_cmd == QUERY_PARAMETER_SIGMA) {
+		struct Lna lna;
+		uint8_t frame[LTEL_FRAME_SIZE];
+		lna = get_lna();
+		sigma_set_parameter_frame(frame, lna);
+		uart1_send_frame((char*) frame, LTEL_FRAME_SIZE);
+	}
+}
+
+void lna_uart_read() {
+	uint8_t rcvcount = 0;
+	uint32_t tickstart = HAL_GetTick();
+	bool timeout = false;
+	uint8_t timeout_value = 10;
+
+	while (rcvcount < RX_UART1_BUFFLEN && timeout == false) {
+		if (((HAL_GetTick() - tickstart) > timeout_value)
+				|| (timeout_value == 0U)) {
+			timeout = true;
+			if (READ_BIT(USART1->ISR, USART_ISR_ORE))
+				SET_BIT(USART1->ICR, USART_ICR_ORECF);
+			if (READ_BIT(USART1->ISR, USART_ISR_IDLE))
+				SET_BIT(USART1->ICR, USART_ICR_IDLECF);
+			if (READ_BIT(USART1->ISR, USART_ISR_FE))
+				SET_BIT(USART1->ICR, USART_ICR_FECF);
+		}
+
+		if (READ_BIT(USART1->ISR, USART_ISR_RXNE_RXFNE))
+			UART1_rxBuffer[rcvcount++] = USART1->RDR;
+	}
+}
+
+bool lna_check_valid_str() {
+	bool is_valid_data = false;
+	if (UART1_rxBuffer[0] == LTEL_START_MARK)
+		if (UART1_rxBuffer[1] == MODULE_FUNCTION)
+			if (UART1_rxBuffer[2] == MODULE_ADDR)
+				for (int i = 3; i < RX_UART1_BUFFLEN && isDataReady == false;
+						i++)
+					is_valid_data =
+							UART1_rxBuffer[i] == LTEL_END_MARK ?
+							true :
+																	false;
+	return is_valid_data;
+}
+
 void set_attenuation(uint8_t attenuation, uint8_t times) {
 
 	if (attenuation < 0 || attenuation > 31) {
@@ -770,36 +721,24 @@ void adc_media_calc() {
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
-
-	if (adc_counter < MEDIA_NUM) {
-		adc0_values[adc_counter] = adcResultsDMA[0];
-		adc1_values[adc_counter] = adcResultsDMA[1];
-		adc2_values[adc_counter] = adcResultsDMA[2];
-		adc3_values[adc_counter] = adcResultsDMA[3];
-		adc_counter++;
-
-	} else {
-		adc_counter = 0;
-
-	}
-
+	// TODO : se puede reemplazar leyendo el flag del registro
+	adcDataReady = true;
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
 
 }
 /* USER CODE END 4 */
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
-void Error_Handler(void)
-{
-  /* USER CODE BEGIN Error_Handler_Debug */
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
+void Error_Handler(void) {
+	/* USER CODE BEGIN Error_Handler_Debug */
 	/* User can add his own implementation to report the HAL error return state */
 	__disable_irq();
 	while (1) {
 	}
-  /* USER CODE END Error_Handler_Debug */
+	/* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef  USE_FULL_ASSERT
