@@ -150,6 +150,7 @@ uint8_t get_dbm_pout(uint16_t pout_adc);
 struct Lna get_lna();
 void set_attenuation(uint8_t attenuation, uint8_t times);
 void adc_media_calc();
+void uart_clean_buffer();
 
 //void uart_reset_reading(UART_HandleTypeDef *huart);
 /* USER CODE END PFP */
@@ -228,48 +229,25 @@ int main(void) {
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
-
 		if (isDataReady) {
 			lna_cmd_action();
 			isDataReady = false;
-			for (int i = 0; i < TX_UART1_BUFFLEN; i++) {
-				if (i < RX_UART1_BUFFLEN)
-					UART1_rxBuffer[i] = 0x00;
-				UART1_txBuffer[i] = 0x00;
-			}
-		}
-
-		if (isDataReady == false) {
+			uart_clean_buffer();
+		} else {
 			lna_uart_read();
 			isDataReady = lna_check_valid_str();
 		}
-
-		if (HAL_GetTick() - led_counter > LED_STATE_TIMEOUT) {
+		if (HAL_GetTick() - led_counter > LED_STATE_TIMEOUT)
 			led_counter = HAL_GetTick();
-		} else {
-			if (HAL_GetTick() - led_counter > LED_ON_TIMEOUT) {
+		else {
+			if (HAL_GetTick() - led_counter > LED_ON_TIMEOUT)
 				led_off();
-
-			} else {
+			else
 				led_on();
-			}
-
-			if (adcDataReady) {
-				if (adc_counter < MEDIA_NUM) {
-					adc0_values[adc_counter] = adcResultsDMA[0];
-					adc1_values[adc_counter] = adcResultsDMA[1];
-					adc2_values[adc_counter] = adcResultsDMA[2];
-					adc3_values[adc_counter] = adcResultsDMA[3];
-					adc_counter++;
-
-				} else {
-					adc_counter = 0;
-
-				}
-				adcDataReady = false;
-			}
-			//HAL_IWDG_Refresh(&hiwdg);
 		}
+
+		//HAL_IWDG_Refresh(&hiwdg);
+
 	}   //Fin while
 	/* USER CODE END 3 */
 }
@@ -666,7 +644,7 @@ bool lna_check_valid_str() {
 	if (UART1_rxBuffer[0] == LTEL_START_MARK)
 		if (UART1_rxBuffer[1] == MODULE_FUNCTION)
 			if (UART1_rxBuffer[2] == MODULE_ADDR)
-				for (int i = 3; i < RX_UART1_BUFFLEN && isDataReady == false;
+				for (int i = 3; i < RX_UART1_BUFFLEN && is_valid_data == false;
 						i++)
 					is_valid_data =
 							UART1_rxBuffer[i] == LTEL_END_MARK ?
@@ -702,6 +680,13 @@ void set_attenuation(uint8_t attenuation, uint8_t times) {
 	}
 }
 
+void uart_clean_buffer() {
+	for (int i = 0; i < TX_UART1_BUFFLEN; i++) {
+		if (i < RX_UART1_BUFFLEN)
+			UART1_rxBuffer[i] = 0x00;
+		UART1_txBuffer[i] = 0x00;
+	}
+}
 void adc_media_calc() {
 	uint32_t sum0 = 0;
 	uint32_t sum1 = 0;
@@ -722,7 +707,15 @@ void adc_media_calc() {
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 	// TODO : se puede reemplazar leyendo el flag del registro
-	adcDataReady = true;
+	if (adc_counter < MEDIA_NUM) {
+		adc0_values[adc_counter] = adcResultsDMA[0];
+		adc1_values[adc_counter] = adcResultsDMA[1];
+		adc2_values[adc_counter] = adcResultsDMA[2];
+		adc3_values[adc_counter] = adcResultsDMA[3];
+		adc_counter++;
+	} else {
+		adc_counter = 0;
+	}
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
 
 }
