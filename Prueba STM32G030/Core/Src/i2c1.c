@@ -125,3 +125,26 @@ void i2c1_start(char saddr, uint8_t transfer_request, uint8_t N) {
 
 }
 
+void i2c1_scanner(uint8_t *addr) {
+	uint32_t counter = HAL_GetTick();
+	uint8_t j = 0;
+	bool timeout = false;
+
+	for (int i = 1; i < 128; i++) {
+		i2c1_start(i << 1 | 1, READ, 1);
+		timeout = false;
+
+		while (!READ_BIT(I2C1->ISR, I2C_ISR_RXNE) & !timeout) {
+
+			if (HAL_GetTick() - counter > 500) {
+				counter = HAL_GetTick();
+				timeout = true;
+			}
+		}
+		if (!timeout) {
+			addr[j++] = i;
+			READ_REG(I2C1->RXDR);
+		}
+	}
+}
+

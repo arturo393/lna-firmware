@@ -7,7 +7,7 @@
 
 #include "stm32g0xx.h"
 #include "main.h"
-
+#include "stdbool.h"
 #ifndef INC_I2C1_H_
 #define INC_I2C1_H_
 
@@ -18,5 +18,6 @@ void i2c1_init();
 void  i2c1_start(char,uint8_t,uint8_t);
 char i2c1_byteReceive(char ,uint8_t);
 void i2c1_byteTransmit(char,char*,uint8_t);
+void i2c1_scanner(uint8_t *addr);
 
 #endif /* INC_I2C1_H_ */
