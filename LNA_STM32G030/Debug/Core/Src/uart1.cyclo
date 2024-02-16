@@ -1,0 +1,8 @@
+../Core/Src/uart1.c:10:6:uart1_gpio_init	1
+../Core/Src/uart1.c:49:6:uart1_init	2
+../Core/Src/uart1.c:83:6:uart1_dma_init	1
+../Core/Src/uart1.c:93:6:uart1_write	3
+../Core/Src/uart1.c:106:6:uart1_read	9
+../Core/Src/uart1.c:131:6:uart1_1byte_read	4
+../Core/Src/uart1.c:143:6:uart1_send_str	2
+../Core/Src/uart1.c:149:6:uart1_write_frame	3
