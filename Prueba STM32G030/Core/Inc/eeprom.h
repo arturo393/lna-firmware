@@ -1,33 +1,27 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file           : main.h
-  * @brief          : Header for main.c file.
+  * @file           : eeprom.h
+  * @brief          : Header for eeprom.c file.
   *                   This file contains the common defines of the application.
   ******************************************************************************
-  * @attention
   *
-  * Copyright (c) 2022 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
 /* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __MAIN_H
-#define __MAIN_H
+#ifndef __EEPROM_H
+#define __EEPROM_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32g0xx_hal.h"
+#include "main.h"
+
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -50,31 +44,19 @@ extern "C" {
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
-void Error_Handler(void);
+uint8_t EEPROM_Read(uint8_t address);
+void EEPROM_Write(uint8_t address, uint8_t data);
+void EEPROM_2byte_Write(uint8_t addr, uint16_t data);
+uint16_t EEPROM_2byte_Read(uint8_t address);
 
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define Pout_Volt_Pin GPIO_PIN_0
-#define Pout_Volt_GPIO_Port GPIOA
-#define LE_ATTENUATOR_Pin GPIO_PIN_1
-#define LE_ATTENUATOR_GPIO_Port GPIOA
-#define CLK_ATTENUATOR_Pin GPIO_PIN_4
-#define CLK_ATTENUATOR_GPIO_Port GPIOA
-#define DATA_ATTENUATOR_Pin GPIO_PIN_5
-#define DATA_ATTENUATOR_GPIO_Port GPIOA
-#define Current_Volt_Pin GPIO_PIN_6
-#define Current_Volt_GPIO_Port GPIOA
-#define Volt_Volt_Pin GPIO_PIN_7
-#define Volt_Volt_GPIO_Port GPIOA
-#define AGC_Volt_Pin GPIO_PIN_0
-#define AGC_Volt_GPIO_Port GPIOB
-#define LED_Pin GPIO_PIN_1
-#define LED_GPIO_Port GPIOB
-#define DE_Pin GPIO_PIN_15
-#define DE_GPIO_Port GPIOA
+#define EEPROM_CHIP_ADDR 0x50
+#define EEPROM_PAGE_SIZE 8
+#define EEPrOM_PAGE_NUM 32
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
@@ -83,4 +65,4 @@ void Error_Handler(void);
 }
 #endif
 
-#endif /* __MAIN_H */
+#endif /* __EEPROM_H */
