@@ -7,6 +7,7 @@
 *.o
 *.ko
 *.obj
+*.elf
 
 # Linker output
 *.ilk
@@ -65,14 +66,4 @@ ctrlp.root
 #html
 *.html
 
-*.cproject*
-.mxproject*
-.cproject
-.project
-.settings/
-
-object.list*
-
-
-Prueba STM32G030/Drivers/*
-Prueba STM32G030/Release/Drivers
+./Prueba STM32G030/Drivers/STM32G0xx_HAL_Driver/Src/stm32g0xx_ll_rcc.c

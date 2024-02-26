@@ -1,0 +1,4 @@
+../Core/Src/eeprom.c:40:9:eeprom_1byte_read	1
+../Core/Src/eeprom.c:48:6:eeprom_1byte_write	2
+../Core/Src/eeprom.c:59:6:eeprom_2byte_write	1
+../Core/Src/eeprom.c:65:10:eeprom_2byte_read	1
