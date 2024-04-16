@@ -15,7 +15,7 @@ uint16_t crc_get(uint8_t* buffer, uint8_t buff_len) {
 				crc <<= 1;
 		}
 	}
-	return crc;
+	return (crc);
 }
 
 bool crc_check(uint8_t *frame, uint8_t len, uint8_t *crc_frame) {

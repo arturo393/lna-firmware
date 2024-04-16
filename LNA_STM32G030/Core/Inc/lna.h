@@ -14,6 +14,8 @@
 #include "stdbool.h"
 #include "stdio.h"
 #include "stdlib.h"
+#include "string.h"
+#include "utils.h"
 
 #define SYS_FREQ 64000000
 #define APB_FREQ SYS_FREQ
@@ -49,7 +51,7 @@
 #define LTEL_START_MARK  0x7e
 #define LTEL_END_MARK  0x7f
 
-#define POUT_DBM_MAX  0
+#define POUT_DBM_MAX  -2
 #define POUT_DBM_MIN  -30
 #define POUT_ADC_MAX  1833
 #define POUT_ADC_MIN  488
@@ -113,6 +115,7 @@ void lna_cmd_action();
 void lna_uart_read();
 bool lna_check_valid_str();
 //Hardware interaction functions:
-void bda4601_set_att(uint8_t attenuation, uint8_t times);
+void set_attenuation_to_bda4601(uint8_t attenuation, uint8_t times);
+
 
 #endif /* INC_LNA_H_ */

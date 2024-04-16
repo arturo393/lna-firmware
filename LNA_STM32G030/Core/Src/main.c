@@ -83,8 +83,6 @@ static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 
-void bda4601_set_att(uint8_t attenuation, uint8_t times);
-void adc_media_calc();
 void uart_clean_buffer();
 
 //void uart_reset_reading(UART_HandleTypeDef *huart);
@@ -157,7 +155,7 @@ int main(void) {
 	HAL_GPIO_WritePin(UART1_TX_ENABLE_GPIO_Port, UART1_TX_ENABLE_Pin,
 			GPIO_PIN_RESET);
 	uint8_t tries = 3;
-	bda4601_set_att(eeprom_1byte_read(LNA_ATT_ADDR), tries);
+	set_attenuation_to_bda4601(eeprom_1byte_read(LNA_ATT_ADDR), tries);
 
 	if (eeprom_1byte_read(POUT_ISCALIBRATED_ADDR) != POUT_ISCALIBRATED) {
 		eeprom_2byte_write(POUT_ADC_MIN_ADDR, POUT_ADC_MIN);
@@ -173,7 +171,7 @@ int main(void) {
 	led_counter = HAL_GetTick();
 	uint32_t lna_print_counter = HAL_GetTick();
 
-	bda4601_set_att(eeprom_1byte_read(LNA_ATT_ADDR), 5);
+	set_attenuation_to_bda4601(eeprom_1byte_read(LNA_ATT_ADDR), 5);
 	while (1) {
 
 //Fin function 1 second
@@ -194,11 +192,11 @@ int main(void) {
 			case SET_ATT_LTEL:
 				uint8_t attenuation_value = UART1_rxBuffer[6];
 				uint8_t tries = 2;
-				bda4601_set_att(attenuation_value, tries);
+				set_attenuation_to_bda4601(attenuation_value, tries);
 				eeprom_1byte_write(LNA_ATT_ADDR, attenuation_value);
 				tx_buffer_size = sprintf((char*) UART1_txBuffer,
 						"Attenuation %u\r\n", attenuation_value);
-				uart1_write_frame(UART1_txBuffer, tx_buffer_size);
+				uart1_write_frame((char*)UART1_txBuffer, tx_buffer_size);
 				break;
 			case SET_POUT_MAX:
 				eeprom_2byte_write(POUT_ADC_MAX_ADDR,
@@ -208,7 +206,7 @@ int main(void) {
 				tx_buffer_size = sprintf((char*) UART1_txBuffer,
 						"Saved adc = %d as Pout 0 [dBm]\n\r",
 						adcResultsDMA[POUT_INDEX]);
-				uart1_write_frame(UART1_txBuffer, tx_buffer_size);
+				uart1_write_frame((char*)UART1_txBuffer, tx_buffer_size);
 				break;
 			case SET_POUT_MIN:
 				eeprom_2byte_write(POUT_ADC_MIN_ADDR,
@@ -218,7 +216,7 @@ int main(void) {
 				tx_buffer_size = sprintf((char*) UART1_txBuffer,
 						"Saved adc = %d as Pout -30 [dBm]\n\r",
 						adcResultsDMA[POUT_INDEX]);
-				uart1_write_frame(UART1_txBuffer, tx_buffer_size);
+				uart1_write_frame((char*)UART1_txBuffer, tx_buffer_size);
 				break;
 			case QUERY_PARAMETER_STR:
 				isPrintEnable = !isPrintEnable;
@@ -252,7 +250,6 @@ int main(void) {
 				struct Lna lna;
 				lna = calulate_lna_real_values(adcResultsDMA);
 				char *buffer = (char*) UART1_txBuffer;
-				uint8_t buffer_length;
 				tx_buffer_size =
 						sprintf(buffer,
 								"Pout %d[dBm] Att %u[dB] Gain %u[dB] Pin %d[dBm] Curent %d[mA] Voltage %u[V]\r\n",
@@ -261,7 +258,7 @@ int main(void) {
 
 				HAL_GPIO_WritePin(UART1_TX_ENABLE_GPIO_Port,
 				UART1_TX_ENABLE_Pin, GPIO_PIN_SET);
-				HAL_UART_Transmit(&huart1, buffer, tx_buffer_size,
+				HAL_UART_Transmit(&huart1,(uint8_t*) buffer, tx_buffer_size,
 				UART_TRANSMIT_TIMEOUT);
 				HAL_GPIO_WritePin(UART1_TX_ENABLE_GPIO_Port,
 				UART1_TX_ENABLE_Pin, GPIO_PIN_RESET);
@@ -544,7 +541,8 @@ static void MX_GPIO_Init(void) {
 /* USER CODE BEGIN 4 */
 
 void uart_clean_buffer() {
-	memset(UART1_rxBuffer, 0, RX_UART1_BUFFLEN);
+	memset((uint8_t*)UART1_rxBuffer, 0, RX_UART1_BUFFLEN);
+
 	memset(UART1_txBuffer, 0, TX_UART1_BUFFLEN);
 	tx_buffer_size = 0;
 	uart1_rcv_counter = 0;
@@ -563,7 +561,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 	/* Read received data from UART1 */
 	if (uart1_rcv_counter >= RX_UART1_BUFFLEN) {
-		memset(UART1_rxBuffer, 0, RX_UART1_BUFFLEN);
+		memset((uint8_t*)UART1_rxBuffer, 0, RX_UART1_BUFFLEN);
 		uart1_rcv_counter = 0;
 	}
 	HAL_UART_Receive_IT(&huart1, &rxData, 1);
