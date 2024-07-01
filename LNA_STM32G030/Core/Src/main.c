@@ -50,9 +50,12 @@
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
+I2C_HandleTypeDef hi2c1;
+
 IWDG_HandleTypeDef hiwdg;
 
 UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
 
@@ -69,7 +72,6 @@ uint8_t UART1_txBuffer[TX_UART1_BUFFLEN] = { 0 };
 uint8_t tx_buffer_size;
 bool isDataReady = false;
 
-
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc);
 
 /* USER CODE END PV */
@@ -78,6 +80,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc);
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
+static void MX_I2C1_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
@@ -98,6 +101,7 @@ void uart_clean_buffer();
  * @retval int
  */
 int main(void) {
+
 	/* USER CODE BEGIN 1 */
 	//__disable_irq();
 	/* USER CODE END 1 */
@@ -131,10 +135,8 @@ int main(void) {
 	MX_DMA_Init();
 	MX_ADC1_Init();
 	MX_USART1_UART_Init();
-    MX_IWDG_Init();
-
+//	MX_IWDG_Init();
 	i2c1_init();
-//	uart1_init(HS16_CLK, BAUD_RATE);
 	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
@@ -148,12 +150,11 @@ int main(void) {
 	HAL_UART_Receive_IT(&huart1, &rxData, 1);
 
 	tx_buffer_size = sprintf((char*) UART1_txBuffer, "LNA init\n\r");
-	HAL_GPIO_WritePin(UART1_TX_ENABLE_GPIO_Port, UART1_TX_ENABLE_Pin,
-			GPIO_PIN_SET);
+	HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
 	HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
 	UART_TRANSMIT_TIMEOUT);
-	HAL_GPIO_WritePin(UART1_TX_ENABLE_GPIO_Port, UART1_TX_ENABLE_Pin,
-			GPIO_PIN_RESET);
+
+	HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
 	uint8_t tries = 3;
 	set_attenuation_to_bda4601(eeprom_1byte_read(LNA_ATT_ADDR), tries);
 
@@ -170,7 +171,6 @@ int main(void) {
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
 	led_counter = HAL_GetTick();
 	uint32_t lna_print_counter = HAL_GetTick();
-
 	set_attenuation_to_bda4601(eeprom_1byte_read(LNA_ATT_ADDR), 5);
 	while (1) {
 
@@ -187,7 +187,10 @@ int main(void) {
 			case QUERY_PARAMETER_LTEL:
 				lna = calulate_lna_real_values(adcResultsDMA);
 				packet_lna_for_ltel_protocol(frame, lna);
-				uart1_write_frame((char*) frame, LTEL_FRAME_SIZE);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+				HAL_UART_Transmit(&huart1, frame, LTEL_FRAME_SIZE,
+				UART_TRANSMIT_TIMEOUT);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
 				break;
 			case SET_ATT_LTEL:
 				uint8_t attenuation_value = UART1_rxBuffer[6];
@@ -196,7 +199,10 @@ int main(void) {
 				eeprom_1byte_write(LNA_ATT_ADDR, attenuation_value);
 				tx_buffer_size = sprintf((char*) UART1_txBuffer,
 						"Attenuation %u\r\n", attenuation_value);
-				uart1_write_frame((char*)UART1_txBuffer, tx_buffer_size);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+				HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+				UART_TRANSMIT_TIMEOUT);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
 				break;
 			case SET_POUT_MAX:
 				eeprom_2byte_write(POUT_ADC_MAX_ADDR,
@@ -206,7 +212,11 @@ int main(void) {
 				tx_buffer_size = sprintf((char*) UART1_txBuffer,
 						"Saved adc = %d as Pout 0 [dBm]\n\r",
 						adcResultsDMA[POUT_INDEX]);
-				uart1_write_frame((char*)UART1_txBuffer, tx_buffer_size);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+				HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+				UART_TRANSMIT_TIMEOUT);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
+
 				break;
 			case SET_POUT_MIN:
 				eeprom_2byte_write(POUT_ADC_MIN_ADDR,
@@ -216,13 +226,12 @@ int main(void) {
 				tx_buffer_size = sprintf((char*) UART1_txBuffer,
 						"Saved adc = %d as Pout -30 [dBm]\n\r",
 						adcResultsDMA[POUT_INDEX]);
-				uart1_write_frame((char*)UART1_txBuffer, tx_buffer_size);
+				uart1_write_frame((char*) UART1_txBuffer, tx_buffer_size);
 				break;
 			case QUERY_PARAMETER_STR:
 				isPrintEnable = !isPrintEnable;
 				break;
 			case QUERY_ADC:
-				//adc_media_calc();
 				sprintf((char*) UART1_txBuffer,
 						"Pout %d  \t Gain %u \t Curent %u \t Voltage %u\r\n",
 						adcResultsDMA[POUT_INDEX], adcResultsDMA[GAIN_INDEX],
@@ -256,12 +265,12 @@ int main(void) {
 								lna.pout, lna.attenuation, lna.gain, lna.pin,
 								lna.current, (uint8_t) lna.voltage);
 
-				HAL_GPIO_WritePin(UART1_TX_ENABLE_GPIO_Port,
-				UART1_TX_ENABLE_Pin, GPIO_PIN_SET);
-				HAL_UART_Transmit(&huart1,(uint8_t*) buffer, tx_buffer_size,
+				HAL_GPIO_WritePin(DE_GPIO_Port,
+				DE_Pin, GPIO_PIN_SET);
+				HAL_UART_Transmit(&huart1, (uint8_t*) buffer, tx_buffer_size,
 				UART_TRANSMIT_TIMEOUT);
-				HAL_GPIO_WritePin(UART1_TX_ENABLE_GPIO_Port,
-				UART1_TX_ENABLE_Pin, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(DE_GPIO_Port,
+				DE_Pin, GPIO_PIN_RESET);
 				lna_print_counter = HAL_GetTick();
 
 			}
@@ -274,7 +283,7 @@ int main(void) {
 			else
 				led_on();
 		}
-		HAL_IWDG_Refresh(&hiwdg);
+		//HAL_IWDG_Refresh(&hiwdg);
 
 	}   //Fin while
 	/* USER CODE END 3 */
@@ -303,8 +312,8 @@ void SystemClock_Config(void) {
 	RCC_OscInitStruct.LSIState = RCC_LSI_ON;
 	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
 	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-	RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV1;
-	RCC_OscInitStruct.PLL.PLLN = 8;
+	RCC_OscInitStruct.PLL.PLLM = RCC_PLLM_DIV2;
+	RCC_OscInitStruct.PLL.PLLN = 16;
 	RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
 	RCC_OscInitStruct.PLL.PLLR = RCC_PLLR_DIV2;
 	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
@@ -405,6 +414,51 @@ static void MX_ADC1_Init(void) {
 }
 
 /**
+ * @brief I2C1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_I2C1_Init(void) {
+
+	/* USER CODE BEGIN I2C1_Init 0 */
+
+	/* USER CODE END I2C1_Init 0 */
+
+	/* USER CODE BEGIN I2C1_Init 1 */
+
+	/* USER CODE END I2C1_Init 1 */
+	hi2c1.Instance = I2C1;
+	hi2c1.Init.Timing = 0x00602173;
+	hi2c1.Init.OwnAddress1 = 0;
+	hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+	hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+	hi2c1.Init.OwnAddress2 = 0;
+	hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+	hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+	hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+	if (HAL_I2C_Init(&hi2c1) != HAL_OK) {
+		Error_Handler();
+	}
+
+	/** Configure Analogue filter
+	 */
+	if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE)
+			!= HAL_OK) {
+		Error_Handler();
+	}
+
+	/** Configure Digital filter
+	 */
+	if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN I2C1_Init 2 */
+
+	/* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
  * @brief IWDG Initialization Function
  * @param None
  * @retval None
@@ -446,7 +500,7 @@ static void MX_USART1_UART_Init(void) {
 
 	/* USER CODE END USART1_Init 1 */
 	huart1.Instance = USART1;
-	huart1.Init.BaudRate = 115200;
+	huart1.Init.BaudRate = 9600;
 	huart1.Init.WordLength = UART_WORDLENGTH_8B;
 	huart1.Init.StopBits = UART_STOPBITS_1;
 	huart1.Init.Parity = UART_PARITY_NONE;
@@ -485,6 +539,9 @@ static void MX_DMA_Init(void) {
 	__HAL_RCC_DMA1_CLK_ENABLE();
 
 	/* DMA interrupt init */
+	/* DMA1_Channel1_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
 	/* DMA1_Channel2_3_IRQn interrupt configuration */
 	HAL_NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
@@ -508,11 +565,14 @@ static void MX_GPIO_Init(void) {
 	/*Configure GPIO pin Output Level */
 	HAL_GPIO_WritePin(GPIOA,
 			LE_ATTENUATOR_Pin | CLK_ATTENUATOR_Pin | DATA_ATTENUATOR_Pin
-					| UART1_TX_ENABLE_Pin, GPIO_PIN_RESET);
+					| DE_Pin, GPIO_PIN_RESET);
 
-	/*Configure GPIO pins : LE_ATTENUATOR_Pin CLK_ATTENUATOR_Pin DATA_ATTENUATOR_Pin UART1_TX_ENABLE_Pin */
+	/*Configure GPIO pin Output Level */
+	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+
+	/*Configure GPIO pins : LE_ATTENUATOR_Pin CLK_ATTENUATOR_Pin DATA_ATTENUATOR_Pin DE_Pin */
 	GPIO_InitStruct.Pin = LE_ATTENUATOR_Pin | CLK_ATTENUATOR_Pin
-			| DATA_ATTENUATOR_Pin | UART1_TX_ENABLE_Pin;
+			| DATA_ATTENUATOR_Pin | DE_Pin;
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -526,13 +586,12 @@ static void MX_GPIO_Init(void) {
 	GPIO_InitStruct.Alternate = GPIO_AF1_USART2;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-	/*Configure GPIO pins : PB6 PB7 */
-	GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
-	GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+	/*Configure GPIO pin : LED_Pin */
+	GPIO_InitStruct.Pin = LED_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	GPIO_InitStruct.Alternate = GPIO_AF6_I2C1;
-	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+	HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
 	/* USER CODE BEGIN MX_GPIO_Init_2 */
 	/* USER CODE END MX_GPIO_Init_2 */
@@ -541,13 +600,12 @@ static void MX_GPIO_Init(void) {
 /* USER CODE BEGIN 4 */
 
 void uart_clean_buffer() {
-	memset((uint8_t*)UART1_rxBuffer, 0, RX_UART1_BUFFLEN);
+	memset((uint8_t*) UART1_rxBuffer, 0, RX_UART1_BUFFLEN);
 
 	memset(UART1_txBuffer, 0, TX_UART1_BUFFLEN);
 	tx_buffer_size = 0;
 	uart1_rcv_counter = 0;
 }
-
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 // TODO : se puede reemplazar leyendo el flag del registro
@@ -561,7 +619,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 	/* Read received data from UART1 */
 	if (uart1_rcv_counter >= RX_UART1_BUFFLEN) {
-		memset((uint8_t*)UART1_rxBuffer, 0, RX_UART1_BUFFLEN);
+		memset((uint8_t*) UART1_rxBuffer, 0, RX_UART1_BUFFLEN);
 		uart1_rcv_counter = 0;
 	}
 	HAL_UART_Receive_IT(&huart1, &rxData, 1);

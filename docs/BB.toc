@@ -1,0 +1,20 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {section}{\numberline {1}Introducción}{3}{section.1}%
+\contentsline {section}{\numberline {2}Interfaces LNA}{3}{section.2}%
+\contentsline {section}{\numberline {3}Repositorio}{3}{section.3}%
+\contentsline {section}{\numberline {4}Descripción del Código}{5}{section.4}%
+\contentsline {section}{\numberline {5}Carga de firmware desde ST32CubeIDE}{8}{section.5}%
+\contentsline {section}{\numberline {6}Carga de firmware STM32CubeProgrammer}{8}{section.6}%
+\contentsline {section}{\numberline {7}Protocolo de Comunicación por RS-485}{10}{section.7}%
+\contentsline {section}{\numberline {8}Calibración}{10}{section.8}%
+\contentsline {section}{\numberline {9}Comandos}{10}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Ajuste de atenuación - 0x200000}{10}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}Ajuste de Potencia Máxima de calibración - 0x240000}{10}{subsection.9.2}%
+\contentsline {subsection}{\numberline {9.3}Ajuste de Potencia Mínima de calibración - 0x230000}{11}{subsection.9.3}%
+\contentsline {subsection}{\numberline {9.4}Consulta de parámetros - 0x110000}{11}{subsection.9.4}%
+\contentsline {subsection}{\numberline {9.5}Consulta de parámetros - Sigma - 0x120000}{11}{subsection.9.5}%
+\contentsline {subsection}{\numberline {9.6}Lecturas decodificadas - 0x150000}{11}{subsection.9.6}%
+\contentsline {subsection}{\numberline {9.7}Valores ADC - 0x160000}{12}{subsection.9.7}%
+\contentsline {subsection}{\numberline {9.8}Lista de comandos}{12}{subsection.9.8}%
+\contentsline {section}{\numberline {10}Versiones del Firmware}{12}{section.10}%
+\contentsline {section}{\numberline {11}Revisión del documento}{13}{section.11}%
