@@ -8,18 +8,17 @@
 #ifndef INC_MEMORY_HPP_
 #define INC_MEMORY_HPP_
 
-
-
 #include <main.h>
 #include <map>
 #include <string>
 
 class MemLocation {
 public:
-	MemLocation(uint_8 _address, int size);
+	MemLocation(uint8_t _address, int _size);
 	uint8_t address;
 	int size;
 };
+
 
 template <typename T>
 class Memory {
@@ -37,9 +36,8 @@ private:
 	std::map<std::string, MemLocation> value_addr;
 	uint8_t EEPROM_Read(uint8_t address);
 	void EEPROM_Write(uint8_t address, uint8_t data);
-	uint16_t EEPROM_byte_Write(uint8_t addr, T data);
-	void EEPROM_2byte_Read(uint8_t address);
-
+	void EEPROM_byte_Write(uint8_t addr, T data);
+	uint16_t EEPROM_2byte_Read(uint8_t address);
 };
 
 
