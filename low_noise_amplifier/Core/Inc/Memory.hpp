@@ -37,7 +37,7 @@ private:
 	uint8_t EEPROM_Read(uint8_t address);
 	void EEPROM_Write(uint8_t address, uint8_t data);
 	void EEPROM_byte_Write(uint8_t addr, T data);
-	uint16_t EEPROM_2byte_Read(uint8_t address);
+	T EEPROM_byte_Read(uint8_t address);
 };
 
 

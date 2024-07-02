@@ -37,12 +37,9 @@ template<typename T>
 T Memory<T>::getValue(std::string name) {
 	MemLocation location;
 	location = value_addr[name];
-	if ((location.size == 1) && (sizeof(T) == location.size)) {
-		return (this->EEPROM_Read(location.address));
-	} else if ((location.size == 2) && (sizeof(T) == location.size)) {
-		return (this->EEPROM_2byte_Read(location.address));
-	}
+  return (this->EEPROM_byte_Read(location.address));
 }
+
 
 template<typename T>
 void Memory<T>::setValue(std::string name, T value) {
@@ -62,6 +59,24 @@ uint8_t Memory<T>::EEPROM_Read(uint8_t address) {
 	HAL_I2C_Master_Receive(hi2c, EEPROM_CHIP_ADDR << 1 | 1, &buff[1], 1, 100);
 	return (buff[1]);
 }
+
+template<typename T>
+T Memory<T>::EEPROM_byte_Read(uint8_t address) {
+	T data = 0;
+  int size = sizeof(T);
+  int i;
+
+  for (i = size - 1; i <= 0; i--){
+    if (i < size - 1) {
+      HAL_Delay(5);
+      data = data << 8;
+    }
+    data |= EEPROM_Read(address + i); 
+  }
+
+	return data;
+}
+
 template<typename T>
 void Memory<T>::EEPROM_Write(uint8_t address, uint8_t data) {
 	uint8_t buff[2];
@@ -80,18 +95,8 @@ void Memory<T>::EEPROM_byte_Write(uint8_t addr, T data) {
 	int i;
 	int size = sizeof(T);
 
-	for (int i = 0; i < size; i++, data = data >> 8) {
+	for (i = 0; i < size; i++, data = data >> 8) {
 		EEPROM_Write(addr + i, static_cast<uint8_t>(data & 0xff));
 		HAL_Delay(5);
 	}
-}
-
-template<typename T>
-uint16_t Memory<T>::EEPROM_2byte_Read(uint8_t address) {
-	uint16_t data = 0;
-	data = EEPROM_Read(address + 1) << 8;
-	HAL_Delay(5);
-	data |= EEPROM_Read(address);
-
-	return data;
 }
