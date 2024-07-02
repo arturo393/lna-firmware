@@ -21,14 +21,14 @@ public:
 	int size;
 };
 
+template <typename T>
 class Memory {
 public:
 	Memory(I2C_HandleTypeDef* _hi2c);
 	virtual ~Memory();
 	void createKey(std::string name,MemLocation address);
-	template <typename T>
 	T getValue(std::string name);
-	void setValue(std::string name,uint8_t value);
+	void setValue(std::string name, T value);
 private:
 	I2C_HandleTypeDef* hi2c;
 	uint8_t EEPROM_CHIP_ADDR = 0x50;
@@ -37,7 +37,7 @@ private:
 	std::map<std::string, MemLocation> value_addr;
 	uint8_t EEPROM_Read(uint8_t address);
 	void EEPROM_Write(uint8_t address, uint8_t data);
-	uint16_t EEPROM_2byte_Write(uint8_t addr, uint16_t data);
+	uint16_t EEPROM_byte_Write(uint8_t addr, T data);
 	void EEPROM_2byte_Read(uint8_t address);
 
 };

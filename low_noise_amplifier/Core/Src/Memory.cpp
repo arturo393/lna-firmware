@@ -30,6 +30,7 @@ void Memory::createKey(std::string name, MemLocation address) {
   value_addr[name] = address;
 }
 
+template <typename T>
 T Memory::getValue(std::string name) {
   location = value_addr[name];
   if ((location.size == 1) && (sizeof(T) == location.size)) {
@@ -39,9 +40,10 @@ T Memory::getValue(std::string name) {
   }
 }
 
+template <typename T>
 void Memory::setValue(std::string name, T value) {
   std::map<string, MemLocation> it;
-  Memory location;
+  MemLocation location;
 
   it = value_addr.find(name);
   if (it != value_addr.end()) {
@@ -71,6 +73,7 @@ void Memory::EEPROM_Write(uint8_t address, uint8_t data) {
 		HAL_I2C_Master_Transmit(hi2c, EEPROM_CHIP_ADDR << 1, buff, 2, 100);
 }
 
+template <typename T>
 void Memory::EEPROM_byte_Write(uint8_t addr, T data) {
   int i;
   size = sizeof(T);
@@ -81,7 +84,6 @@ void Memory::EEPROM_byte_Write(uint8_t addr, T data) {
   }
 }
 
-.
 uint16_t Memory::EEPROM_2byte_Read(uint8_t address) {
 	uint16_t data = 0;
 	data = EEPROM_Read(address + 1) << 8;
