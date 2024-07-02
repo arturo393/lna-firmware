@@ -13,7 +13,9 @@
 
 class GpioHandler {
 public:
+
 	GpioHandler(int _ports, int _pins);
+	GpioHandler();
 	virtual ~GpioHandler();
 	void turnOn(Gpio gpio);
 	void turnOff(Gpio gpio);

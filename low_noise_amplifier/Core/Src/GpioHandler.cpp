@@ -19,7 +19,7 @@ GpioHandler::~GpioHandler() {
 
 
 void GpioHandler::switch_state(Gpio gpio, GPIO_PinState state){
-	HAL_GPIO_WritePin(&gpio.get_port(), gpio.get_pin(), state);
+	HAL_GPIO_WritePin(gpio.get_port(), gpio.get_pin(), state);
 }
 
 void GpioHandler::turnOn(Gpio gpio){

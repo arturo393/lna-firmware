@@ -14,6 +14,8 @@ RFAttenuator::RFAttenuator(GpioHandler _gpioHandler, Gpio _data_pin, Gpio _clock
 	le_pin = _le_pin;
 }
 
+
+
 RFAttenuator::~RFAttenuator() {
 	// TODO Auto-generated destructor stub
 }

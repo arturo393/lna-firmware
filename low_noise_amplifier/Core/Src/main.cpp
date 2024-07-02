@@ -156,10 +156,10 @@ int main(void) {
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	Gpio data_pin = Gpio(*DATA_ATTENUATOR_GPIO_Port, DATA_ATTENUATOR_Pin);
-	Gpio le_pin = Gpio(*LE_ATTENUATOR_GPIO_Port, LE_ATTENUATOR_Pin);
-	Gpio clock_pin = Gpio(*CLK_ATTENUATOR_GPIO_Port, CLK_ATTENUATOR_Pin);
-	Gpio led_pin = Gpio(*LED_GPIO_Port, LED_Pin);
+	Gpio data_pin = Gpio(DATA_ATTENUATOR_GPIO_Port, DATA_ATTENUATOR_Pin);
+	Gpio le_pin = Gpio(LE_ATTENUATOR_GPIO_Port, LE_ATTENUATOR_Pin);
+	Gpio clock_pin = Gpio(CLK_ATTENUATOR_GPIO_Port, CLK_ATTENUATOR_Pin);
+	Gpio led_pin = Gpio(LED_GPIO_Port, LED_Pin);
 
 //	GpioHandler gpioHandler = GpioHandler(4,4);
 

@@ -12,12 +12,13 @@
 
 class Gpio {
 public:
-	Gpio(GPIO_TypeDef _port, uint16_t _pin);
-	GPIO_TypeDef get_port();
+	Gpio();
+	Gpio(GPIO_TypeDef* _port, uint16_t _pin);
+	GPIO_TypeDef* get_port();
 	uint16_t get_pin();
 
 private:
-	GPIO_TypeDef port;
+	GPIO_TypeDef* port;
 	uint16_t pin;
 };
 

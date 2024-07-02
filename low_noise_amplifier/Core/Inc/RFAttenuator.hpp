@@ -14,6 +14,7 @@
 class RFAttenuator {
 public:
 	RFAttenuator(GpioHandler _gpioHandler, Gpio _data_pin, Gpio _clock_pin, Gpio _le_pin);
+	//RFAttenuator(GpioHandler _gpioHandler);
 	virtual ~RFAttenuator();
 
 	void attenuate(int value);

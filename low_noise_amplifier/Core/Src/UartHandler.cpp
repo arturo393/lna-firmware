@@ -78,7 +78,7 @@ bool UartHandler::transmitData(uint8_t *data, uint8_t data_bytes) {
 
 bool UartHandler::transmitMessage(const char *message) {
 	this->prepareTxData(message);
-	return (this->transmitData(this.tx_buffer, this.tx_buffer_size));
+	return (this->transmitData(tx_buffer, tx_buffer_size));
 }
 
 /* Read received data from UART1 */
