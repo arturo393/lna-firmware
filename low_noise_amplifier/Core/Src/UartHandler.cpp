@@ -64,30 +64,21 @@ bool UartHandler::prepareTxData(const char *message) {
 	return (true);
 }
 
-bool UartHandler::transmitMessage(const char *message) {
-	prepareTxData(message);
-	HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_SET);
-	if (HAL_UART_Transmit(huart, tx_buffer, tx_buffer_size,
-	HAL_MAX_DELAY) == HAL_OK) {
-		clearBuffers();  // Clear buffers after successful transmission
-		return (true);
-		HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_SET);
-	}
-	HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_SET);
-	return (false);
-
-}
 bool UartHandler::transmitData(uint8_t *data, uint8_t data_bytes) {
 	HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_SET);
 	if (HAL_UART_Transmit(huart, data, data_bytes,
 	HAL_MAX_DELAY) == HAL_OK) {
-		clearBuffers();  // Clear buffers after successful transmission
+		this->clearBuffers();  // Clear buffers after successful transmission
 		return (true);
 		HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_SET);
 	}
 	HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_SET);
 	return (false);
+}
 
+bool UartHandler::transmitMessage(const char *message) {
+	this->prepareTxData(message);
+	return (this->transmitData(this.tx_buffer, this.tx_buffer_size));
 }
 
 /* Read received data from UART1 */
