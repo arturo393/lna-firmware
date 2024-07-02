@@ -10,8 +10,17 @@
 
 // Implementations of the member functions (would be placed outside the class)
 
+MemLocation::MemLocation(uint_8 _address, int size){
+  address = _address;
+  size = _size;
+}
+
 Memory::Memory(I2C_HandleTypeDef *_hi2c) {
 	hi2c = _hi2c;
+  value_addr['LNA_ATT_ADDR'] = MemLocation(0x00, 1);
+  value_addr['POUT_ADC_MAX_ADDR'] = MemLocation(0x03, 1);
+  value_addr['POUT_ADC_MIN_ADDR'] = MemLocation(0x05, 2);
+  value_addr['POUT_ISCALIBRATED_ADDR'] = MemLocation(0x07, 2);
 }
 
 Memory::~Memory() {}
@@ -21,11 +30,25 @@ void Memory::createKey(std::string name, MemLocation address) {
   value_addr[name] = address;
 }
 
-uint8_t* Memory::getValue(std::string name) {
+T Memory::getValue(std::string name) {
+  location = value_addr[name];
+  if ((location.size == 1) && (sizeof(T) == location.size)) {
+    return (this->EEPROM_Read(location.address));
+  } else if ((location.size == 2) && (sizeof(T) == location.size)) {
+    return (this->EEPROM_2byte_Read(location.address))
+  }
 }
 
-void Memory::setValue(std::string name, uint8_t value) {
+void Memory::setValue(std::string name, T value) {
+  std::map<string, MemLocation> it;
+  Memory location;
 
+  it = value_addr.find(name);
+  if (it != value_addr.end()) {
+    location = value_addr[name];
+    if (sizeof(T) == location.size)
+    this -> EEPROM_byte_Write(location.address, value);
+  }
 }
 
 uint8_t Memory::EEPROM_Read(uint8_t address) {
@@ -48,12 +71,17 @@ void Memory::EEPROM_Write(uint8_t address, uint8_t data) {
 		HAL_I2C_Master_Transmit(hi2c, EEPROM_CHIP_ADDR << 1, buff, 2, 100);
 }
 
-void Memory::EEPROM_2byte_Write(uint8_t addr, uint16_t data) {
-	EEPROM_Write(addr, data & 0xff);
-	HAL_Delay(5);
-	EEPROM_Write(addr + 1, data >> 8);
+void Memory::EEPROM_byte_Write(uint8_t addr, T data) {
+  int i;
+  size = sizeof(T);
+
+ for (int i = 0; i < size; i++, data = data >> 8){
+    EEPROM_Write(addr + i, static_cast<uint8_t>(data & 0xff));
+    HAL_Delay(5);
+  }
 }
 
+.
 uint16_t Memory::EEPROM_2byte_Read(uint8_t address) {
 	uint16_t data = 0;
 	data = EEPROM_Read(address + 1) << 8;

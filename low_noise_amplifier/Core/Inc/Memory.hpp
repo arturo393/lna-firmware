@@ -16,6 +16,7 @@
 
 class MemLocation {
 public:
+	MemLocation(uint_8 _address, int size);
 	uint8_t address;
 	int size;
 };
@@ -25,7 +26,8 @@ public:
 	Memory(I2C_HandleTypeDef* _hi2c);
 	virtual ~Memory();
 	void createKey(std::string name,MemLocation address);
-	uint8_t* getValue(std::string name);
+	template <typename T>
+	T getValue(std::string name);
 	void setValue(std::string name,uint8_t value);
 private:
 	I2C_HandleTypeDef* hi2c;
