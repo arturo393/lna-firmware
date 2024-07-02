@@ -48,5 +48,7 @@ private:
 	T EEPROM_byte_Read(uint8_t address);
 };
 
+#include "Memory.tpp"  // Incluir el archivo de implementación de plantillas (.tpp)
+
 
 #endif /* INC_MEMORY_HPP_ */

@@ -100,26 +100,6 @@ void uart_clean_buffer();
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-#define NUM_CHANNELS 4
-#define OVERSAMPLING_COUNT 16  // Adjust oversampling count as needed
-
-// Channel definitions (assuming PA0 to PA3)
-#define RADIO_POWER_OUT_CHANNEL (ADC_CHANNEL_0 << ADC_CHSELR_CHSEL_Msk)
-#define CURRENT_CONSUMPTION_CHANNEL (ADC_CHANNEL_6 << ADC_CHSELR_CHSEL_Msk)
-#define POWER_VOLTAGE_CHANNEL (ADC_CHANNEL_7 << ADC_CHSELR_CHSEL_Msk)
-#define AGC_LEVEL_CHANNEL (ADC_CHANNEL_8 << ADC_CHSELR_CHSEL_Msk)
-
-void configChannel(ADC_HandleTypeDef *hdac, uint32_t channel) {
-	/** Configure Regular Channel
-	 */ADC_ChannelConfTypeDef sConfig = { 0 };
-	sConfig.Channel = channel;
-	sConfig.Rank = ADC_REGULAR_RANK_1;
-	sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
-	if (HAL_ADC_ConfigChannel(hdac, &sConfig) != HAL_OK) {
-		Error_Handler();
-	}
-}
-
 struct Lna lna;
 /* USER CODE END 0 */
 
@@ -160,9 +140,10 @@ int main(void) {
 
 	std::string lna_att_str = "LNA_ATT_ADDR";
 	int value = 20;
-	eeeprom.setValue(lna_att_str,value);
+	eeeprom.setValue(lna_att_str, static_cast<uint8_t>(5));
 	HAL_Delay(2);
-	uint8_t lna_att = eeeprom.getValue<uint8_t>("LNA_ATT_ADDR");
+	uint8_t lna_att = 0;
+	lna_att = eeeprom.getValue<uint8_t>("LNA_ATT_ADDR");
 	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
