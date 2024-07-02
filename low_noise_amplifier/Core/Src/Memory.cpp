@@ -74,7 +74,7 @@ T Memory<T>::EEPROM_byte_Read(uint8_t address) {
     data |= EEPROM_Read(address + i); 
   }
 
-	return data;
+	return (data);
 }
 
 template<typename T>
