@@ -25,7 +25,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "eeprom.h"
 #include "utils.h"
 #include "i2c1.h"
 #include "stdbool.h"
@@ -36,6 +35,7 @@
 #include <GpioHandler.hpp>
 #include <RfAttenuator.hpp>
 #include <AdcHandler.hpp>
+#include <Memory.hpp>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -149,10 +149,20 @@ int main(void) {
 	MX_GPIO_Init();
 	MX_ADC1_Init();
 	MX_USART1_UART_Init();
+	MX_I2C1_Init();
 //	MX_IWDG_Init();
-	i2c1_init();
 
+	Memory eeeprom = Memory(&hi2c1);
+	eeeprom.createKey("LNA_ATT_ADDR", MemLocation(0x00, 1));
+	eeeprom.createKey("POUT_ADC_MAX_ADDR", MemLocation(0x03, 1));
+	eeeprom.createKey("POUT_ADC_MIN_ADDR", MemLocation(0x05, 2));
+	eeeprom.createKey("POUT_ISCALIBRATED_ADDR", MemLocation(0x07, 2));
 
+	std::string lna_att_str = "LNA_ATT_ADDR";
+	int value = 20;
+	eeeprom.setValue(lna_att_str,value);
+	HAL_Delay(2);
+	uint8_t lna_att = eeeprom.getValue<uint8_t>("LNA_ATT_ADDR");
 	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
@@ -169,10 +179,10 @@ int main(void) {
 	uint8_t tries = 3;
 //	set_attenuation_to_bda4601(eeprom_1byte_read(LNA_ATT_ADDR), tries);
 
-	if (eeprom_1byte_read(POUT_ISCALIBRATED_ADDR) != POUT_ISCALIBRATED) {
-		eeprom_2byte_write(POUT_ADC_MIN_ADDR, POUT_ADC_MIN);
-		eeprom_2byte_write(POUT_ADC_MAX_ADDR, POUT_ADC_MAX);
-	}
+//	if (eeprom_1byte_read(POUT_ISCALIBRATED_ADDR) != POUT_ISCALIBRATED) {
+//		eeprom_2byte_write(POUT_ADC_MIN_ADDR, POUT_ADC_MIN);
+//		eeprom_2byte_write(POUT_ADC_MAX_ADDR, POUT_ADC_MAX);
+//	}
 	Command command = Command();
 
 	/* USER CODE END 2 */
@@ -183,12 +193,12 @@ int main(void) {
 	Gpio le_pin = Gpio(LE_ATTENUATOR_GPIO_Port, LE_ATTENUATOR_Pin);
 	Gpio clock_pin = Gpio(CLK_ATTENUATOR_GPIO_Port, CLK_ATTENUATOR_Pin);
 	Gpio led_pin = Gpio(LED_GPIO_Port, LED_Pin);
-	AdcHandler rf_power_out = AdcHandler(&hadc1,ADC_CHANNEL_0);
-	AdcHandler current_consumption = AdcHandler(&hadc1,ADC_CHANNEL_6);
-	AdcHandler voltage_input = AdcHandler(&hadc1,ADC_CHANNEL_7);
-	AdcHandler agc_level = AdcHandler(&hadc1,ADC_CHANNEL_8);
+	AdcHandler rf_power_out = AdcHandler(&hadc1, ADC_CHANNEL_0);
+	AdcHandler current_consumption = AdcHandler(&hadc1, ADC_CHANNEL_6);
+	AdcHandler voltage_input = AdcHandler(&hadc1, ADC_CHANNEL_7);
+	AdcHandler agc_level = AdcHandler(&hadc1, ADC_CHANNEL_8);
 
-	GpioHandler gpioHandler = GpioHandler(4,4);
+	GpioHandler gpioHandler = GpioHandler(4, 4);
 
 //	RFAttenuator rfAttenuator = RFAttenuator(gpioHandler, data_pin, clock_pin, le_pin);
 	// Start ADC and enable interrupt (optional, for more efficient background reading)

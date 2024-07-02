@@ -12,7 +12,6 @@
 extern "C" {
 #endif
 #include "main.h"
-#include "eeprom.h"
 #include "stdbool.h"
 #include "stdio.h"
 #include "stdlib.h"
