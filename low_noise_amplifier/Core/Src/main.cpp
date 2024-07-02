@@ -35,6 +35,7 @@
 #include <Gpio.hpp>
 #include <GpioHandler.hpp>
 #include <RfAttenuator.hpp>
+#include <AdcHandler.hpp>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -85,7 +86,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc);
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART1_UART_Init(void);
@@ -100,6 +100,27 @@ void uart_clean_buffer();
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+#define NUM_CHANNELS 4
+#define OVERSAMPLING_COUNT 16  // Adjust oversampling count as needed
+
+// Channel definitions (assuming PA0 to PA3)
+#define RADIO_POWER_OUT_CHANNEL (ADC_CHANNEL_0 << ADC_CHSELR_CHSEL_Msk)
+#define CURRENT_CONSUMPTION_CHANNEL (ADC_CHANNEL_6 << ADC_CHSELR_CHSEL_Msk)
+#define POWER_VOLTAGE_CHANNEL (ADC_CHANNEL_7 << ADC_CHSELR_CHSEL_Msk)
+#define AGC_LEVEL_CHANNEL (ADC_CHANNEL_8 << ADC_CHSELR_CHSEL_Msk)
+
+void configChannel(ADC_HandleTypeDef *hdac, uint32_t channel) {
+	/** Configure Regular Channel
+	 */ADC_ChannelConfTypeDef sConfig = { 0 };
+	sConfig.Channel = channel;
+	sConfig.Rank = ADC_REGULAR_RANK_1;
+	sConfig.SamplingTime = ADC_SAMPLINGTIME_COMMON_1;
+	if (HAL_ADC_ConfigChannel(hdac, &sConfig) != HAL_OK) {
+		Error_Handler();
+	}
+}
+
+struct Lna lna;
 /* USER CODE END 0 */
 
 /**
@@ -115,6 +136,7 @@ int main(void) {
 	/* MCU Configuration--------------------------------------------------------*/
 
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+
 	HAL_Init();
 	/* USER CODE BEGIN Init */
 
@@ -125,13 +147,13 @@ int main(void) {
 
 	/* USER CODE BEGIN SysInit */
 	MX_GPIO_Init();
-	MX_DMA_Init();
 	MX_ADC1_Init();
 	MX_USART1_UART_Init();
 //	MX_IWDG_Init();
 	i2c1_init();
-	/* USER CODE END SysInit */
 
+
+	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
 
@@ -152,6 +174,7 @@ int main(void) {
 		eeprom_2byte_write(POUT_ADC_MAX_ADDR, POUT_ADC_MAX);
 	}
 	Command command = Command();
+
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -160,117 +183,125 @@ int main(void) {
 	Gpio le_pin = Gpio(LE_ATTENUATOR_GPIO_Port, LE_ATTENUATOR_Pin);
 	Gpio clock_pin = Gpio(CLK_ATTENUATOR_GPIO_Port, CLK_ATTENUATOR_Pin);
 	Gpio led_pin = Gpio(LED_GPIO_Port, LED_Pin);
+	AdcHandler rf_power_out = AdcHandler(&hadc1,ADC_CHANNEL_0);
+	AdcHandler current_consumption = AdcHandler(&hadc1,ADC_CHANNEL_6);
+	AdcHandler voltage_input = AdcHandler(&hadc1,ADC_CHANNEL_7);
+	AdcHandler agc_level = AdcHandler(&hadc1,ADC_CHANNEL_8);
 
-//	GpioHandler gpioHandler = GpioHandler(4,4);
+	GpioHandler gpioHandler = GpioHandler(4,4);
 
 //	RFAttenuator rfAttenuator = RFAttenuator(gpioHandler, data_pin, clock_pin, le_pin);
-
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
+	// Start ADC and enable interrupt (optional, for more efficient background reading)
 	led_counter = HAL_GetTick();
 	uint32_t lna_print_counter = HAL_GetTick();
 //	set_attenuation_to_bda4601(eeprom_1byte_read(LNA_ATT_ADDR), 5);
 //	rfAttenuator.attenuate(30);
 	myUart.receive_it();
-	struct Lna lna;
+
 	while (1) {
 		/* USER CODE END WHILE */
 
+		adcResultsDMA[0] = rf_power_out.getChannelValue();
+		adcResultsDMA[1] = current_consumption.getChannelValue();
+		adcResultsDMA[2] = voltage_input.getChannelValue();
+		adcResultsDMA[3] = agc_level.getChannelValue();
+
 		/* USER CODE BEGIN 3 */
-		uint8_t LTEL_FRAME_LENGTH = 14;
-		uint8_t frame[LTEL_FRAME_LENGTH];
-
-		if(myUart.isDataReady){
+		if (myUart.isDataReady) {
 
 		}
 
-		if (myUart.command == command.getQueryParameterLTEL()) {
-			//lna = calulate_lna_real_values(adcResultsDMA);
-			packet_lna_for_ltel_protocol(frame, lna);
-			myUart.transmitData(frame, LTEL_FRAME_SIZE);
-		} else if (myUart.command == command.getSetAttLTEL()) {
-			uint8_t attenuation_value = UART1_rxBuffer[6];
-			uint8_t tries = 2;
-			set_attenuation_to_bda4601(attenuation_value, tries);
-			eeprom_1byte_write(LNA_ATT_ADDR, attenuation_value);
-			tx_buffer_size = sprintf((char*) UART1_txBuffer,
-					"Attenuation %u\r\n", attenuation_value);
-			HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
-			HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
-			UART_TRANSMIT_TIMEOUT);
-			HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
+		/*
+		 if (myUart.command == command.getQueryParameterLTEL()) {
+		 //lna = calulate_lna_real_values(adcResultsDMA);
+		 packet_lna_for_ltel_protocol(frame, lna);
+		 myUart.transmitData(frame, LTEL_FRAME_SIZE);
+		 } else if (myUart.command == command.getSetAttLTEL()) {
+		 uint8_t attenuation_value = UART1_rxBuffer[6];
+		 uint8_t tries = 2;
+		 set_attenuation_to_bda4601(attenuation_value, tries);
+		 eeprom_1byte_write(LNA_ATT_ADDR, attenuation_value);
+		 tx_buffer_size = sprintf((char*) UART1_txBuffer,
+		 "Attenuation %u\r\n", attenuation_value);
+		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+		 HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+		 UART_TRANSMIT_TIMEOUT);
+		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
 
-		} else if (myUart.command == command.getSetPoutMax()) {
-			eeprom_2byte_write(POUT_ADC_MAX_ADDR, adcResultsDMA[POUT_INDEX]);
-			HAL_Delay(5);
-			eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
-			tx_buffer_size = sprintf((char*) UART1_txBuffer,
-					"Saved adc = %d as Pout 0 [dBm]\n\r",
-					adcResultsDMA[POUT_INDEX]);
-			HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
-			HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
-			UART_TRANSMIT_TIMEOUT);
-			HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-		} else if (myUart.command == command.getSetPoutMin()) {
-			eeprom_2byte_write(POUT_ADC_MIN_ADDR, adcResultsDMA[POUT_INDEX]);
-			HAL_Delay(5);
-			eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
-			tx_buffer_size = sprintf((char*) UART1_txBuffer,
-					"Saved adc = %d as Pout -30 [dBm]\n\r",
-					adcResultsDMA[POUT_INDEX]);
-			HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
-			HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
-			UART_TRANSMIT_TIMEOUT);
-			HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-		} else if (myUart.command == command.getQueryParameterStr()) {
-			isPrintEnable = !isPrintEnable;
-		} else if (myUart.command == command.getQueryADC()) {
-			tx_buffer_size = sprintf((char*) UART1_txBuffer,
-					"Pout %d  \t Gain %u \t Curent %u \t Voltage %u\r\n",
-					adcResultsDMA[POUT_INDEX], adcResultsDMA[GAIN_INDEX],
-					adcResultsDMA[CURRENT_INDEX], adcResultsDMA[VOLTAGE_INDEX]);
-			HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
-			HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
-			UART_TRANSMIT_TIMEOUT);
-			HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-		} else if (myUart.command == command.getQueryParameterSigma()) {
-			lna = calulate_lna_real_values(adcResultsDMA);
-			sigma_set_parameter_frame(frame, lna);
-			tx_buffer_size = LTEL_FRAME_SIZE;
-			HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
-			HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
-			UART_TRANSMIT_TIMEOUT);
-			HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-		}
+		 } else if (myUart.command == command.getSetPoutMax()) {
+		 eeprom_2byte_write(POUT_ADC_MAX_ADDR, adcResultsDMA[POUT_INDEX]);
+		 HAL_Delay(5);
+		 eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
+		 tx_buffer_size = sprintf((char*) UART1_txBuffer,
+		 "Saved adc = %d as Pout 0 [dBm]\n\r",
+		 adcResultsDMA[POUT_INDEX]);
+		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+		 HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+		 UART_TRANSMIT_TIMEOUT);
+		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
+		 } else if (myUart.command == command.getSetPoutMin()) {
+		 eeprom_2byte_write(POUT_ADC_MIN_ADDR, adcResultsDMA[POUT_INDEX]);
+		 HAL_Delay(5);
+		 eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
+		 tx_buffer_size = sprintf((char*) UART1_txBuffer,
+		 "Saved adc = %d as Pout -30 [dBm]\n\r",
+		 adcResultsDMA[POUT_INDEX]);
+		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+		 HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+		 UART_TRANSMIT_TIMEOUT);
+		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
+		 } else if (myUart.command == command.getQueryParameterStr()) {
+		 isPrintEnable = !isPrintEnable;
+		 } else if (myUart.command == command.getQueryADC()) {
+		 tx_buffer_size = sprintf((char*) UART1_txBuffer,
+		 "Pout %d  \t Gain %u \t Curent %u \t Voltage %u\r\n",
+		 adcResultsDMA[POUT_INDEX], adcResultsDMA[GAIN_INDEX],
+		 adcResultsDMA[CURRENT_INDEX], adcResultsDMA[VOLTAGE_INDEX]);
+		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+		 HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+		 UART_TRANSMIT_TIMEOUT);
+		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
+		 } else if (myUart.command == command.getQueryParameterSigma()) {
+		 //lna = calulate_lna_real_values(adcResultsDMA);
+		 sigma_set_parameter_frame(frame, lna);
+		 tx_buffer_size = LTEL_FRAME_SIZE;
+		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+		 HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+		 UART_TRANSMIT_TIMEOUT);
+		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
+		 }
 
-		if (isPrintEnable)
-			if (HAL_GetTick() - lna_print_counter > LNA_PRINT_TIMEOUT) {
-				struct Lna lna;
-				lna = calulate_lna_real_values(adcResultsDMA);
-				char *buffer = (char*) UART1_txBuffer;
-				tx_buffer_size =
-						sprintf(buffer,
-								"Pout %d"
-										"[dBm] Att %u[dB] Gain %u[dB] Pin %d[dBm] Curent %d[mA] Voltage %u[V]\r\n",
-								lna.pout, lna.attenuation, lna.gain, lna.pin,
-								lna.current, (uint8_t) lna.voltage);
+		 if (isPrintEnable)
+		 if (HAL_GetTick() - lna_print_counter > LNA_PRINT_TIMEOUT) {
+		 struct Lna lna;
+		 lna = calulate_lna_real_values(adcResultsDMA);
+		 char *buffer = (char*) UART1_txBuffer;
+		 tx_buffer_size =
+		 sprintf(buffer,
+		 "Pout %d"
+		 "[dBm] Att %u[dB] Gain %u[dB] Pin %d[dBm] Curent %d[mA] Voltage %u[V]\r\n",
+		 lna.pout, lna.attenuation, lna.gain, lna.pin,
+		 lna.current, (uint8_t) lna.voltage);
 
-				HAL_GPIO_WritePin(DE_GPIO_Port,
-				DE_Pin, GPIO_PIN_SET);
-				HAL_UART_Transmit(&huart1, (uint8_t*) buffer, tx_buffer_size,
-				UART_TRANSMIT_TIMEOUT);
-				HAL_GPIO_WritePin(DE_GPIO_Port,
-				DE_Pin, GPIO_PIN_RESET);
-				lna_print_counter = HAL_GetTick();
+		 HAL_GPIO_WritePin(DE_GPIO_Port,
+		 DE_Pin, GPIO_PIN_SET);
+		 HAL_UART_Transmit(&huart1, (uint8_t*) buffer, tx_buffer_size,
+		 UART_TRANSMIT_TIMEOUT);
+		 HAL_GPIO_WritePin(DE_GPIO_Port,
+		 DE_Pin, GPIO_PIN_RESET);
+		 lna_print_counter = HAL_GetTick();
 
-			}
+		 }
+
+		 */
 
 		if (HAL_GetTick() - led_counter > LED_STATE_TIMEOUT)
 			led_counter = HAL_GetTick();
 		else {
 			if (HAL_GetTick() - led_counter > LED_ON_TIMEOUT)
-				led_off();
+				gpioHandler.turnOn(led_pin);
 			else
-				led_on();
+				gpioHandler.turnOff(led_pin);
 		}
 		//HAL_IWDG_Refresh(&hiwdg);
 
@@ -342,23 +373,25 @@ static void MX_ADC1_Init(void) {
 	/** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
 	 */
 	hadc1.Instance = ADC1;
-	hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+	hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
 	hadc1.Init.Resolution = ADC_RESOLUTION_12B;
 	hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
 	hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
-	hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
+	hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
 	hadc1.Init.LowPowerAutoWait = DISABLE;
 	hadc1.Init.LowPowerAutoPowerOff = DISABLE;
-	hadc1.Init.ContinuousConvMode = DISABLE;
+	hadc1.Init.ContinuousConvMode = ENABLE;
 	hadc1.Init.NbrOfConversion = 4;
-	hadc1.Init.DiscontinuousConvMode = DISABLE;
 	hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
 	hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-	hadc1.Init.DMAContinuousRequests = ENABLE;
+	hadc1.Init.DMAContinuousRequests = DISABLE;
 	hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
-	hadc1.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_12CYCLES_5;
-	hadc1.Init.SamplingTimeCommon2 = ADC_SAMPLETIME_12CYCLES_5;
-	hadc1.Init.OversamplingMode = DISABLE;
+	hadc1.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_160CYCLES_5;
+	hadc1.Init.SamplingTimeCommon2 = ADC_SAMPLETIME_1CYCLE_5;
+	hadc1.Init.OversamplingMode = ENABLE;
+	hadc1.Init.Oversampling.Ratio = ADC_OVERSAMPLING_RATIO_2;
+	hadc1.Init.Oversampling.RightBitShift = ADC_RIGHTBITSHIFT_NONE;
+	hadc1.Init.Oversampling.TriggeredMode = ADC_TRIGGEREDMODE_SINGLE_TRIGGER;
 	hadc1.Init.TriggerFrequencyMode = ADC_TRIGGER_FREQ_HIGH;
 	if (HAL_ADC_Init(&hadc1) != HAL_OK) {
 		Error_Handler();
@@ -375,7 +408,6 @@ static void MX_ADC1_Init(void) {
 
 	/** Configure Regular Channel
 	 */
-	sConfig.Channel = ADC_CHANNEL_6;
 	sConfig.Rank = ADC_REGULAR_RANK_2;
 	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
 		Error_Handler();
@@ -383,7 +415,6 @@ static void MX_ADC1_Init(void) {
 
 	/** Configure Regular Channel
 	 */
-	sConfig.Channel = ADC_CHANNEL_8;
 	sConfig.Rank = ADC_REGULAR_RANK_3;
 	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
 		Error_Handler();
@@ -391,7 +422,6 @@ static void MX_ADC1_Init(void) {
 
 	/** Configure Regular Channel
 	 */
-	sConfig.Channel = ADC_CHANNEL_7;
 	sConfig.Rank = ADC_REGULAR_RANK_4;
 	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
 		Error_Handler();
@@ -401,7 +431,6 @@ static void MX_ADC1_Init(void) {
 	/* USER CODE END ADC1_Init 2 */
 
 }
-
 /**
  * @brief I2C1 Initialization Function
  * @param None
@@ -520,24 +549,6 @@ static void MX_USART1_UART_Init(void) {
 }
 
 /**
- * Enable DMA controller clock
- */
-static void MX_DMA_Init(void) {
-
-	/* DMA controller clock enable */
-	__HAL_RCC_DMA1_CLK_ENABLE();
-
-	/* DMA interrupt init */
-	/* DMA1_Channel1_IRQn interrupt configuration */
-	HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
-	HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-	/* DMA1_Channel2_3_IRQn interrupt configuration */
-	HAL_NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0, 0);
-	HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
-
-}
-
-/**
  * @brief GPIO Initialization Function
  * @param None
  * @retval None
@@ -596,18 +607,17 @@ void uart_clean_buffer() {
 	uart1_rcv_counter = 0;
 }
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
-// TODO : se puede reemplazar leyendo el flag del registro
-
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) adcResultsDMA, 4);
-
-}
-
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 // Read received data from UART1
 	myUart.receive_it();
 
 }
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
+	// This function is called after each ADC conversion sequence
+
+}
+
 /* USER CODE END 4 */
 
 /**
@@ -620,8 +630,7 @@ void Error_Handler(void) {
 	__disable_irq();
 	while (1) {
 	}
-	/* USER CODE END Error_Handler_Debug */
-}
+	/* USER CODE END Error_Handler_Debug */}
 
 #ifdef  USE_FULL_ASSERT
 /**

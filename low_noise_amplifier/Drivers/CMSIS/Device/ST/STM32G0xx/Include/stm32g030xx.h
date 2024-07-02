@@ -635,7 +635,7 @@ typedef struct
 #define GPIOF               ((GPIO_TypeDef *) GPIOF_BASE)
 #define ADC1                ((ADC_TypeDef *) ADC1_BASE)
 #define ADC1_COMMON         ((ADC_Common_TypeDef *) ADC1_COMMON_BASE)
-#define Adc                 (ADC1_COMMON) /* Kept for legacy purpose */
+#define ADC                 (ADC1_COMMON) /* Kept for legacy purpose */
 
 
 
