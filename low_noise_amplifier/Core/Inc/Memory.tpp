@@ -1,19 +1,19 @@
 // Memory.tpp
 
+
 template<typename T>
-T Memory::getValue(std::string name) {
-	MemLocation location;
-	location = value_addr[name];
-	uint8_t addr = 0;
+T Memory::getValue(int key) {
+	MemoryLocation location;
+	location = value_addr[key];
 	return (this->EEPROM_byte_Read<T>(location.address));
 }
 
 
 template<typename T>
-void Memory::setValue(std::string name, T value) {
-    MemLocation location;
-    if (value_addr.count(name)) {
-        location = value_addr[name];
+void Memory::setValue(int key, T value) {
+    MemoryLocation location;
+    if (value_addr.count(key)) {
+        location = value_addr[key];
         if (sizeof(T) == location.size)
             this->EEPROM_byte_Write(location.address, value);
     }

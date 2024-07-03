@@ -40,7 +40,10 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+#define LNA_ATT_KEY 1
+#define POUT_ADC_MAX_KEY 2
+#define POUT_ADC_MIN_KEY 3
+#define POUT_ISCALIBRATED_KEY 4
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -54,32 +57,20 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
-DMA_HandleTypeDef hdma_adc1;
 
 I2C_HandleTypeDef hi2c1;
 
 IWDG_HandleTypeDef hiwdg;
 
 UART_HandleTypeDef huart1;
-DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
-
-volatile uint16_t adcResultsDMA[4];
 bool adcDataReady = false;
 bool isPrintEnable = false;
 
 uint32_t led_counter = 0;
-
-volatile uint8_t UART1_rxBuffer[RX_UART1_BUFFLEN] = { 0 };
-uint8_t uart1_rcv_counter = 0;
-uint8_t rxData;
-uint8_t UART1_txBuffer[TX_UART1_BUFFLEN] = { 0 };
-uint8_t tx_buffer_size;
-bool isDataReady = false;
 UartHandler myUart(&huart1, DE_GPIO_Port, DE_Pin, 25, 100);
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc);
 
 /* USER CODE END PV */
 
@@ -91,10 +82,6 @@ static void MX_ADC1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
-
-void uart_clean_buffer();
-
-//void uart_reset_reading(UART_HandleTypeDef *huart);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -132,18 +119,29 @@ int main(void) {
 	MX_I2C1_Init();
 //	MX_IWDG_Init();
 
+	Command command = Command();
 	Memory eeeprom = Memory(&hi2c1);
-	eeeprom.createKey("LNA_ATT_ADDR", MemLocation(0x00, 1));
-	eeeprom.createKey("POUT_ADC_MAX_ADDR", MemLocation(0x03, 1));
-	eeeprom.createKey("POUT_ADC_MIN_ADDR", MemLocation(0x05, 2));
-	eeeprom.createKey("POUT_ISCALIBRATED_ADDR", MemLocation(0x07, 2));
+	eeeprom.createKey(LNA_ATT_KEY,LNA_ATT_ADDR, sizeof(uint8_t));
+	eeeprom.createKey(POUT_ADC_MAX_KEY, POUT_ADC_MAX_ADDR, sizeof(uint8_t));
+	eeeprom.createKey(POUT_ADC_MIN_KEY, POUT_ADC_MIN_ADDR, sizeof(uint16_t));
 
+	eeeprom.createKey(POUT_ISCALIBRATED_KEY, POUT_ISCALIBRATED_ADDR, sizeof(uint16_t));
+	Gpio data_pin = Gpio(DATA_ATTENUATOR_GPIO_Port, DATA_ATTENUATOR_Pin);
+	Gpio le_pin = Gpio(LE_ATTENUATOR_GPIO_Port, LE_ATTENUATOR_Pin);
+	Gpio clock_pin = Gpio(CLK_ATTENUATOR_GPIO_Port, CLK_ATTENUATOR_Pin);
+	Gpio led_pin = Gpio(LED_GPIO_Port, LED_Pin);
+	AdcHandler rf_power_out = AdcHandler(&hadc1, ADC_CHANNEL_0);
+	AdcHandler current_consumption = AdcHandler(&hadc1, ADC_CHANNEL_6);
+	AdcHandler voltage_input = AdcHandler(&hadc1, ADC_CHANNEL_7);
+	AdcHandler agc_level = AdcHandler(&hadc1, ADC_CHANNEL_8);
+/*
 	std::string lna_att_str = "LNA_ATT_ADDR";
 	int value = 20;
 	eeeprom.setValue(lna_att_str, static_cast<uint8_t>(5));
 	HAL_Delay(2);
 	uint8_t lna_att = 0;
 	lna_att = eeeprom.getValue<uint8_t>("LNA_ATT_ADDR");
+	*/
 	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
@@ -164,12 +162,13 @@ int main(void) {
 //		eeprom_2byte_write(POUT_ADC_MIN_ADDR, POUT_ADC_MIN);
 //		eeprom_2byte_write(POUT_ADC_MAX_ADDR, POUT_ADC_MAX);
 //	}
-	Command command = Command();
+//	Command command = Command();
 
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
+	/*
 	Gpio data_pin = Gpio(DATA_ATTENUATOR_GPIO_Port, DATA_ATTENUATOR_Pin);
 	Gpio le_pin = Gpio(LE_ATTENUATOR_GPIO_Port, LE_ATTENUATOR_Pin);
 	Gpio clock_pin = Gpio(CLK_ATTENUATOR_GPIO_Port, CLK_ATTENUATOR_Pin);
@@ -180,23 +179,23 @@ int main(void) {
 	AdcHandler agc_level = AdcHandler(&hadc1, ADC_CHANNEL_8);
 
 	GpioHandler gpioHandler = GpioHandler(4, 4);
-
+*/
 //	RFAttenuator rfAttenuator = RFAttenuator(gpioHandler, data_pin, clock_pin, le_pin);
 	// Start ADC and enable interrupt (optional, for more efficient background reading)
 	led_counter = HAL_GetTick();
 	uint32_t lna_print_counter = HAL_GetTick();
 //	set_attenuation_to_bda4601(eeprom_1byte_read(LNA_ATT_ADDR), 5);
 //	rfAttenuator.attenuate(30);
-	myUart.receive_it();
+//	myUart.receive_it();
 
 	while (1) {
 		/* USER CODE END WHILE */
-
-		adcResultsDMA[0] = rf_power_out.getChannelValue();
-		adcResultsDMA[1] = current_consumption.getChannelValue();
-		adcResultsDMA[2] = voltage_input.getChannelValue();
-		adcResultsDMA[3] = agc_level.getChannelValue();
-
+		/*
+		rf_power_out.getChannelValue();
+		current_consumption.getChannelValue();
+		voltage_input.getChannelValue();
+		agc_level.getChannelValue();
+*/
 		/* USER CODE BEGIN 3 */
 		if (myUart.isDataReady) {
 
@@ -286,6 +285,7 @@ int main(void) {
 
 		 */
 
+		/*
 		if (HAL_GetTick() - led_counter > LED_STATE_TIMEOUT)
 			led_counter = HAL_GetTick();
 		else {
@@ -294,6 +294,7 @@ int main(void) {
 			else
 				gpioHandler.turnOff(led_pin);
 		}
+		*/
 		//HAL_IWDG_Refresh(&hiwdg);
 
 	}   //Fin while
@@ -499,43 +500,51 @@ static void MX_IWDG_Init(void) {
  * @param None
  * @retval None
  */
-static void MX_USART1_UART_Init(void) {
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
 
-	/* USER CODE BEGIN USART1_Init 0 */
+  /* USER CODE BEGIN USART1_Init 0 */
 
-	/* USER CODE END USART1_Init 0 */
+  /* USER CODE END USART1_Init 0 */
 
-	/* USER CODE BEGIN USART1_Init 1 */
+  /* USER CODE BEGIN USART1_Init 1 */
 
-	/* USER CODE END USART1_Init 1 */
-	huart1.Instance = USART1;
-	huart1.Init.BaudRate = 9600;
-	huart1.Init.WordLength = UART_WORDLENGTH_8B;
-	huart1.Init.StopBits = UART_STOPBITS_1;
-	huart1.Init.Parity = UART_PARITY_NONE;
-	huart1.Init.Mode = UART_MODE_TX_RX;
-	huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-	huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-	huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-	huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-	huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-	if (HAL_UART_Init(&huart1) != HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8)
-			!= HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8)
-			!= HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK) {
-		Error_Handler();
-	}
-	/* USER CODE BEGIN USART1_Init 2 */
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 9600;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
 
-	/* USER CODE END USART1_Init 2 */
+  /* USER CODE END USART1_Init 2 */
 
 }
 
@@ -590,13 +599,6 @@ static void MX_GPIO_Init(void) {
 
 /* USER CODE BEGIN 4 */
 
-void uart_clean_buffer() {
-	memset((uint8_t*) UART1_rxBuffer, 0, RX_UART1_BUFFLEN);
-
-	memset(UART1_txBuffer, 0, TX_UART1_BUFFLEN);
-	tx_buffer_size = 0;
-	uart1_rcv_counter = 0;
-}
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 // Read received data from UART1
@@ -604,10 +606,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 }
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
-	// This function is called after each ADC conversion sequence
-
-}
 
 /* USER CODE END 4 */
 
