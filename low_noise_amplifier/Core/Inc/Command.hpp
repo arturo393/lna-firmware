@@ -6,12 +6,12 @@
  */
 
 #include "main.h"
+#include <cstring>
 // Abstract class Function
 class Command {
 
 public:
-	Command(uint8_t _module_function, uint8_t _module_id,
-			uint8_t _max_rx_buffer_size, uint8_t _max_tx_buffer_size);
+	Command(uint8_t _module_function, uint8_t _module_id);
 	virtual ~Command();
 
 	// Virtual destructor (optional)
@@ -69,7 +69,8 @@ private:
 	uint8_t max_tx_buffer_size;
 	uint8_t *rx_buffer;
 	uint8_t *tx_buffer;
-	uint8_t tx_buffer_size;
+	uint8_t rx_counter;
+	uint8_t tx_counter;
 
 	uint8_t module_function;
 	uint8_t module_id;
@@ -85,5 +86,8 @@ private:
 	uint8_t SET_ATT_LTEL = 0x20;
 	uint8_t SET_POUT_MAX = 0x24;
 	uint8_t SET_POUT_MIN = 0x23;
+
+	bool prepareTxData(const char *message);
+	void handleRxData(uint8_t data);
 };
 

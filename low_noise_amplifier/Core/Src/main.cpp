@@ -126,7 +126,7 @@ int main(void) {
 	 * adcHandler
 	 */
 
-	Command command = Command(MODULE_FUNCTION,MODULE_ADDRESS,25,100);
+	Command command = Command(MODULE_FUNCTION,MODULE_ADDRESS);
 	UartHandler myUart(command,&huart1, DE_GPIO_Port, DE_Pin);
 
 	Memory eeeprom = Memory(&hi2c1);

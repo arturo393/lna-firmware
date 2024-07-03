@@ -18,8 +18,6 @@ UartHandler::UartHandler(const Command &_command, UART_HandleTypeDef *_huart,
 }
 
 UartHandler::~UartHandler() {
-	delete[] rx_buffer;
-	delete[] tx_buffer;
 }
 
 void UartHandler::clearBuffers() {
@@ -31,34 +29,7 @@ void UartHandler::clearBuffers() {
 	start_byte = false;
 }
 
-void UartHandler::handleRxData(uint8_t data) {
-	if (uart1_rcv_counter < max_rx_buffer_size) {
-		rx_buffer[uart1_rcv_counter++] = data;
-	}
-}
 
-bool UartHandler::prepareTxData(const char *message) {
-	// 1. Calculate message length (avoid using sprintf for this)
-	size_t message_length = std::strlen(message);
-
-	// 2. Check if message fits within the buffer size
-	if (message_length >= max_tx_buffer_size) {
-		// Handle error: message too long
-		// (e.g., return false, set an error flag)
-		return (false);
-	}
-
-	// 3. Use safer string copy function (consider snprintf if needed)
-	std::strncpy(reinterpret_cast<char*>(tx_buffer), message,
-			max_tx_buffer_size);
-	// Ensure null termination even if message length reaches max_tx_buffer_size
-	tx_buffer[message_length] = '\0';
-
-	// 4. Update tx_buffer_size with actual copied message length
-	tx_buffer_size = message_length;
-
-	return (true);
-}
 
 bool UartHandler::transmitData(uint8_t *data, uint8_t data_bytes) {
 	HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_SET);
