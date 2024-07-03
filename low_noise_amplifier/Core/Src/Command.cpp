@@ -9,20 +9,34 @@
 #include "Command.hpp" // Include the header file
 
 Command::Command(uint8_t _module_function, uint8_t _module_id) {
-
-	module_function = _module_function;
-	module_id = _module_id;
-	max_rx_buffer_size = 255; // Enforce max size
-	max_tx_buffer_size = 255; // No validation assumed for TX
-	rx_buffer = new uint8_t[max_rx_buffer_size];
-	tx_buffer = new uint8_t[max_tx_buffer_size];
-	rx_counter = 0;
-	tx_counter = 0;
+    module_function = _module_function;
+    module_id = _module_id;
+    max_message_size = 255; // Enforce max size
+    listening = false;
 }
 
 Command::~Command() {
 
 } // Empty destructor (optional)
+
+void Command::checkByte(uint8_t number) {
+  if (listening) {
+    message.push_back(number);
+    if (number == getLTELEndMark()) {
+      listening = false;
+    }
+    if (message.size() >= max_rx_buffer_size) {
+      message.clear();
+      listening = false;
+    }
+  } else {
+    if (number == getLTELStartMark()) {
+      message.clear();
+      message.push_back(number);
+      listening = true;
+    }
+  }
+}
 
 bool Command::prepareTxData(const char *message) {
 	// 1. Calculate message length (avoid using sprintf for this)
