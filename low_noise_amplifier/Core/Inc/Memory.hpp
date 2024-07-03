@@ -9,7 +9,7 @@
 #define INC_MEMORY_HPP_
 
 #include <main.h>
-#include <map>
+#include <vector>
 #include <string>
 
 
@@ -20,12 +20,12 @@ public:
 
 	typedef struct {
 		uint8_t address;
-		int size;
+		uint8_t size;
 	}MemoryLocation;
 
 	Memory(I2C_HandleTypeDef* _hi2c);
 	virtual ~Memory();
-	int createKey(uint8_t address, int size);
+	uint8_t createKey(uint8_t address, uint8_t size);
 
 	template <typename T>
 	T getValue(uint8_t key);

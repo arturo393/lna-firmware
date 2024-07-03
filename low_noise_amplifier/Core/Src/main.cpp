@@ -40,11 +40,11 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD
-#define LNA_ATT_KEY 1
-#define POUT_ADC_MAX_KEY 2
-#define POUT_ADC_MIN_KEY 3
-#define POUT_ISCALIBRATED_KEY 4
-USER CODE END PTD */
+ #define LNA_ATT_KEY 1
+ #define POUT_ADC_MAX_KEY 2
+ #define POUT_ADC_MIN_KEY 3
+ #define POUT_ISCALIBRATED_KEY 4
+ USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
@@ -69,7 +69,6 @@ bool adcDataReady = false;
 bool isPrintEnable = false;
 
 uint32_t led_counter = 0;
-UartHandler myUart(&huart1, DE_GPIO_Port, DE_Pin, 25, 100);
 
 
 /* USER CODE END PV */
@@ -118,89 +117,91 @@ int main(void) {
 	MX_USART1_UART_Init();
 	MX_I2C1_Init();
 //	MX_IWDG_Init();
+	/* memory ok
+	 * attenuator ok
+	 * gpio ok
+	 * gpio handler ok
+	 * adcHandler
+	 */
+
+	UartHandler myUart(&huart1, DE_GPIO_Port, DE_Pin, 25, 100);
 
 	Command command = Command();
 	Memory eeeprom = Memory(&hi2c1);
 	uint8_t lna_att_key = eeeprom.createKey(LNA_ATT_ADDR, sizeof(uint8_t));
-	uint8_t pout_adc_max_key = eeeprom.createKey(POUT_ADC_MAX_ADDR, sizeof(uint8_t));
-	uint8_t pout_adc_min_key = eeeprom.createKey(POUT_ADC_MIN_ADDR, sizeof(uint16_t));
-	uint8_t pout_iscalibrated_key = eeeprom.createKey(POUT_ISCALIBRATED_ADDR, sizeof(uint16_t));
+	uint8_t pout_adc_max_key = eeeprom.createKey(POUT_ADC_MAX_ADDR,
+			sizeof(uint16_t));
+	uint8_t pout_adc_min_key = eeeprom.createKey(POUT_ADC_MIN_ADDR,
+			sizeof(uint16_t));
+	uint8_t pout_iscalibrated_key = eeeprom.createKey(POUT_ISCALIBRATED_ADDR,
+			sizeof(uint8_t));
+	uint8_t att_flag_key = eeeprom.createKey(ATT_FLAG_ADDR, sizeof(uint8_t));
 
-	Gpio data_pin = Gpio(DATA_ATTENUATOR_GPIO_Port, DATA_ATTENUATOR_Pin);
-	Gpio le_pin = Gpio(LE_ATTENUATOR_GPIO_Port, LE_ATTENUATOR_Pin);
-	Gpio clock_pin = Gpio(CLK_ATTENUATOR_GPIO_Port, CLK_ATTENUATOR_Pin);
-	Gpio led_pin = Gpio(LED_GPIO_Port, LED_Pin);
-	AdcHandler rf_power_out = AdcHandler(&hadc1, ADC_CHANNEL_0);
-	AdcHandler current_consumption = AdcHandler(&hadc1, ADC_CHANNEL_6);
-	AdcHandler voltage_input = AdcHandler(&hadc1, ADC_CHANNEL_7);
-	AdcHandler agc_level = AdcHandler(&hadc1, ADC_CHANNEL_8);
-/*
-	std::string lna_att_str = "LNA_ATT_ADDR";
-	int value = 20;
-	eeeprom.setValue(lna_att_str, static_cast<uint8_t>(5));
-	HAL_Delay(2);
-	uint8_t lna_att = 0;
-	lna_att = eeeprom.getValue<uint8_t>("LNA_ATT_ADDR");
-	*/
+	Gpio data_pin(DATA_ATTENUATOR_GPIO_Port, DATA_ATTENUATOR_Pin);
+	Gpio le_pin(LE_ATTENUATOR_GPIO_Port, LE_ATTENUATOR_Pin);
+	Gpio clock_pin(CLK_ATTENUATOR_GPIO_Port, CLK_ATTENUATOR_Pin);
+	Gpio led_pin(LED_GPIO_Port, LED_Pin);
+
+	HAL_ADCEx_Calibration_Start(&hadc1);
+
+	AdcHandler rf_power_out(&hadc1, ADC_CHANNEL_0);
+	AdcHandler current_consumption(&hadc1, ADC_CHANNEL_6);
+	AdcHandler voltage_input(&hadc1, ADC_CHANNEL_7);
+	AdcHandler agc_level(&hadc1, ADC_CHANNEL_8);
+	GpioHandler gpioHandler(4, 4);
+	RFAttenuator rfAttenuator(gpioHandler, data_pin, clock_pin, le_pin);
+
+	uint8_t attenuation_flag = eeeprom.getValue<uint8_t>(att_flag_key);
+
+	if (attenuation_flag == ATT_FLAG) {
+		uint8_t attenuation = eeeprom.getValue<uint8_t>(lna_att_key);
+		rfAttenuator.attenuate(attenuation);
+	} else {
+		eeeprom.setValue(att_flag_key, ATT_FLAG);
+		eeeprom.setValue(lna_att_key, (uint8_t) 0);
+	}
+
+	uint8_t pout_calibration_flag = eeeprom.getValue<uint8_t>(
+	POUT_ISCALIBRATED_ADDR);
+	if (pout_calibration_flag != POUT_ISCALIBRATED) {
+		eeeprom.setValue(POUT_ADC_MIN_ADDR, POUT_ADC_MIN);
+		eeeprom.setValue(POUT_ADC_MAX_ADDR, POUT_ADC_MAX);
+	}
+
+	myUart.transmitMessage("LNA init\n\r");
+	myUart.receive_it();
 	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
 
 	/* USER CODE BEGIN 2 */
 
-// Calibrate The ADC On Power-Up For Better Accuracy
-	//uint8_t addrs[5];
-	//i2c1_scanner(addrs);
-	HAL_ADCEx_Calibration_Start(&hadc1);
-	//HAL_UART_Receive_IT(&huart1, &rxData, 1);
-	myUart.transmitMessage("LNA init\n\r");
-
-	uint8_t tries = 3;
-//	set_attenuation_to_bda4601(eeprom_1byte_read(LNA_ATT_ADDR), tries);
-
-//	if (eeprom_1byte_read(POUT_ISCALIBRATED_ADDR) != POUT_ISCALIBRATED) {
-//		eeprom_2byte_write(POUT_ADC_MIN_ADDR, POUT_ADC_MIN);
-//		eeprom_2byte_write(POUT_ADC_MAX_ADDR, POUT_ADC_MAX);
-//	}
-//	Command command = Command();
 
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	/*
-	Gpio data_pin = Gpio(DATA_ATTENUATOR_GPIO_Port, DATA_ATTENUATOR_Pin);
-	Gpio le_pin = Gpio(LE_ATTENUATOR_GPIO_Port, LE_ATTENUATOR_Pin);
-	Gpio clock_pin = Gpio(CLK_ATTENUATOR_GPIO_Port, CLK_ATTENUATOR_Pin);
-	Gpio led_pin = Gpio(LED_GPIO_Port, LED_Pin);
-	AdcHandler rf_power_out = AdcHandler(&hadc1, ADC_CHANNEL_0);
-	AdcHandler current_consumption = AdcHandler(&hadc1, ADC_CHANNEL_6);
-	AdcHandler voltage_input = AdcHandler(&hadc1, ADC_CHANNEL_7);
-	AdcHandler agc_level = AdcHandler(&hadc1, ADC_CHANNEL_8);
 
-	GpioHandler gpioHandler = GpioHandler(4, 4);
-*/
-//	RFAttenuator rfAttenuator = RFAttenuator(gpioHandler, data_pin, clock_pin, le_pin);
 	// Start ADC and enable interrupt (optional, for more efficient background reading)
 	led_counter = HAL_GetTick();
 	uint32_t lna_print_counter = HAL_GetTick();
 //	set_attenuation_to_bda4601(eeprom_1byte_read(LNA_ATT_ADDR), 5);
-//	rfAttenuator.attenuate(30);
-//	myUart.receive_it();
+//
+	uint16_t adcRredings[4];
 
 	while (1) {
+
 		/* USER CODE END WHILE */
-		/*
-		rf_power_out.getChannelValue();
-		current_consumption.getChannelValue();
-		voltage_input.getChannelValue();
-		agc_level.getChannelValue();
-*/
+
+		adcRredings[0] = rf_power_out.getChannelValue();
+		adcRredings[1] = current_consumption.getChannelValue();
+		adcRredings[2] = voltage_input.getChannelValue();
+		adcRredings[3] = agc_level.getChannelValue();
+
 		/* USER CODE BEGIN 3 */
-		if (myUart.isDataReady) {
+		if (myUart.isDataReady){
 
 		}
-
 		/*
 		 if (myUart.command == command.getQueryParameterLTEL()) {
 		 //lna = calulate_lna_real_values(adcResultsDMA);
@@ -285,7 +286,6 @@ int main(void) {
 
 		 */
 
-		/*
 		if (HAL_GetTick() - led_counter > LED_STATE_TIMEOUT)
 			led_counter = HAL_GetTick();
 		else {
@@ -294,9 +294,8 @@ int main(void) {
 			else
 				gpioHandler.turnOff(led_pin);
 		}
-		*/
-		//HAL_IWDG_Refresh(&hiwdg);
 
+		//HAL_IWDG_Refresh(&hiwdg);
 	}   //Fin while
 	/* USER CODE END 3 */
 }
@@ -501,50 +500,47 @@ static void MX_IWDG_Init(void) {
  * @retval None
  */
 /**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
+ * @brief USART1 Initialization Function
+ * @param None
+ * @retval None
+ */
+static void MX_USART1_UART_Init(void) {
 
-  /* USER CODE BEGIN USART1_Init 0 */
+	/* USER CODE BEGIN USART1_Init 0 */
 
-  /* USER CODE END USART1_Init 0 */
+	/* USER CODE END USART1_Init 0 */
 
-  /* USER CODE BEGIN USART1_Init 1 */
+	/* USER CODE BEGIN USART1_Init 1 */
 
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 9600;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
+	/* USER CODE END USART1_Init 1 */
+	huart1.Instance = USART1;
+	huart1.Init.BaudRate = 9600;
+	huart1.Init.WordLength = UART_WORDLENGTH_8B;
+	huart1.Init.StopBits = UART_STOPBITS_1;
+	huart1.Init.Parity = UART_PARITY_NONE;
+	huart1.Init.Mode = UART_MODE_TX_RX;
+	huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+	huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+	huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+	huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+	if (HAL_UART_Init(&huart1) != HAL_OK) {
+		Error_Handler();
+	}
+	if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8)
+			!= HAL_OK) {
+		Error_Handler();
+	}
+	if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8)
+			!= HAL_OK) {
+		Error_Handler();
+	}
+	if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK) {
+		Error_Handler();
+	}
+	/* USER CODE BEGIN USART1_Init 2 */
 
-  /* USER CODE END USART1_Init 2 */
+	/* USER CODE END USART1_Init 2 */
 
 }
 
@@ -599,13 +595,11 @@ static void MX_GPIO_Init(void) {
 
 /* USER CODE BEGIN 4 */
 
-
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 // Read received data from UART1
 	myUart.receive_it();
 
 }
-
 
 /* USER CODE END 4 */
 

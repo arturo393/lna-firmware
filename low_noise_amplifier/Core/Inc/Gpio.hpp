@@ -12,8 +12,7 @@
 
 class Gpio {
 public:
-	Gpio();
-	Gpio(GPIO_TypeDef* _port, uint16_t _pin);
+	Gpio(GPIO_TypeDef* _port = NULL , uint16_t _pin = 0);
 	GPIO_TypeDef* get_port();
 	uint16_t get_pin();
 

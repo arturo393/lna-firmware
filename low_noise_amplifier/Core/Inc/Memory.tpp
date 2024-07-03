@@ -12,7 +12,7 @@ T Memory::getValue(uint8_t key) {
 template<typename T>
 void Memory::setValue(uint8_t key, T value) {
     MemoryLocation location;
-    if (value_addr.count(key)) {
+    if (value_addr.size() > key) {
         location = value_addr[key];
         if (sizeof(T) == location.size)
             this->EEPROM_byte_Write(location.address, value);

@@ -33,6 +33,7 @@ void UartHandler::clearBuffers() {
 	rxData = 0;
 	isDataReady = false;
 	command = 0;
+	start_byte = false;
 }
 
 void UartHandler::handleRxData(uint8_t data) {
@@ -90,10 +91,16 @@ bool UartHandler::receive_it() {
 	}
 
 	HAL_UART_Receive_IT(huart, &rxData, 1);
-	rx_buffer[uart1_rcv_counter++] = rxData;
-	if (rxData == 0x7F){
-		isDataReady = true;
+	if (rxData == 0x7E)
+		start_byte = true;
+
+	if (start_byte) {
+		rx_buffer[uart1_rcv_counter++] = rxData;
+		if (rxData == 0x7F) {
+			isDataReady = true;
+		}
 	}
+
 	return (isDataReady);
 }
 

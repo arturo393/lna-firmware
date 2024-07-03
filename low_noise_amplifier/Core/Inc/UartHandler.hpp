@@ -41,6 +41,7 @@ private:
 	uint8_t rxData;
 	GPIO_TypeDef *data_enable_port;
 	uint16_t data_enable_pin;
+	bool start_byte;
 
 	static constexpr uint8_t LTEL_START_MARK = 0x7e;
 	static constexpr uint8_t LTEL_END_MARK = 0x7f;

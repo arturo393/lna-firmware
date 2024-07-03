@@ -7,11 +7,14 @@
 
 #include "GpioHandler.hpp"
 
+
 GpioHandler::GpioHandler(int _ports, int _pins){
 	ports = _ports;
 	pins = _pins;
 	// TODO Auto-generated constructor stub
 }
+
+
 
 GpioHandler::~GpioHandler() {
 	// TODO Auto-generated destructor stub

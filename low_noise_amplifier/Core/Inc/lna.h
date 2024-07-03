@@ -46,8 +46,11 @@ extern "C" {
 #define POUT_ADC_MAX_ADDR  0x03
 #define POUT_ADC_MIN_ADDR  0x05
 #define POUT_ISCALIBRATED_ADDR  0x07
+#define ATT_FLAG_ADDR 0x08
 
-#define POUT_ISCALIBRATED  0xAA
+#define ATT_FLAG (uint8_t) 0xAB
+
+#define POUT_ISCALIBRATED (uint8_t) 0xAA
 
 #define LNA_PRINT_TIMEOUT 2000
 #define UART_TRANSMIT_TIMEOUT 1000

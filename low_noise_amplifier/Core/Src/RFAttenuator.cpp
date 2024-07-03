@@ -7,11 +7,12 @@
 
 #include "RFAttenuator.hpp"
 
-RFAttenuator::RFAttenuator(GpioHandler _gpioHandler, Gpio _data_pin, Gpio _clock_pin, Gpio _le_pin) {
-	gpioHandler = _gpioHandler;
-	data_pin = _data_pin;
-	clock_pin = _clock_pin;
-	le_pin = _le_pin;
+RFAttenuator::RFAttenuator(const GpioHandler &_gpioHandler, const Gpio & _data_pin, const Gpio & _clock_pin, const Gpio &_le_pin) {
+  // Initialize member variables with arguments
+  gpioHandler = _gpioHandler;
+  data_pin = _data_pin;
+  clock_pin = _clock_pin;
+  le_pin = _le_pin;
 }
 
 
