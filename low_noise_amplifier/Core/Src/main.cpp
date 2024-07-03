@@ -39,12 +39,12 @@
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
+/* USER CODE BEGIN PTD
 #define LNA_ATT_KEY 1
 #define POUT_ADC_MAX_KEY 2
 #define POUT_ADC_MIN_KEY 3
 #define POUT_ISCALIBRATED_KEY 4
-/* USER CODE END PTD */
+USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
@@ -121,11 +121,11 @@ int main(void) {
 
 	Command command = Command();
 	Memory eeeprom = Memory(&hi2c1);
-	eeeprom.createKey(LNA_ATT_KEY,LNA_ATT_ADDR, sizeof(uint8_t));
-	eeeprom.createKey(POUT_ADC_MAX_KEY, POUT_ADC_MAX_ADDR, sizeof(uint8_t));
-	eeeprom.createKey(POUT_ADC_MIN_KEY, POUT_ADC_MIN_ADDR, sizeof(uint16_t));
+	uint8_t lna_att_key = eeeprom.createKey(LNA_ATT_ADDR, sizeof(uint8_t));
+	uint8_t pout_adc_max_key = eeeprom.createKey(POUT_ADC_MAX_ADDR, sizeof(uint8_t));
+	uint8_t pout_adc_min_key = eeeprom.createKey(POUT_ADC_MIN_ADDR, sizeof(uint16_t));
+	uint8_t pout_iscalibrated_key = eeeprom.createKey(POUT_ISCALIBRATED_ADDR, sizeof(uint16_t));
 
-	eeeprom.createKey(POUT_ISCALIBRATED_KEY, POUT_ISCALIBRATED_ADDR, sizeof(uint16_t));
 	Gpio data_pin = Gpio(DATA_ATTENUATOR_GPIO_Port, DATA_ATTENUATOR_Pin);
 	Gpio le_pin = Gpio(LE_ATTENUATOR_GPIO_Port, LE_ATTENUATOR_Pin);
 	Gpio clock_pin = Gpio(CLK_ATTENUATOR_GPIO_Port, CLK_ATTENUATOR_Pin);

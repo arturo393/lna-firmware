@@ -20,13 +20,13 @@ Memory::Memory(I2C_HandleTypeDef *_hi2c) {
 Memory::~Memory() {
 }
 
-void Memory::createKey(int key,uint8_t address, int size) {
-	// Add the name-address pair to the map
-	//MemLocation mem_location = MemLocation(address,size);
+uint8_t Memory::createKey(uint8_t address, int size) {
+	// Add the name-address pair to the vector
 	MemoryLocation mem_location;
 	mem_location.address = address;
 	mem_location.size = size;
-	value_addr[key] = mem_location;
+	value_addr.push_back(mem_location);
+  return static_cast<uint8_t>(value_addr.size() - 1);
 }
 
 

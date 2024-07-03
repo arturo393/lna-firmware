@@ -25,20 +25,20 @@ public:
 
 	Memory(I2C_HandleTypeDef* _hi2c);
 	virtual ~Memory();
-	void createKey(int key,uint8_t address, int size);
+	int createKey(uint8_t address, int size);
 
 	template <typename T>
-	T getValue(int key);
+	T getValue(uint8_t key);
 
 	template <typename T>
-	void setValue(int key, T value);
+	void setValue(uint8_t key, T value);
 
 private:
 	I2C_HandleTypeDef* hi2c;
 	uint8_t EEPROM_CHIP_ADDR;
 	uint8_t EEPROM_PAGE_SIZE;
 	uint8_t EEPrOM_PAGE_NUM = 32;
-	std::map<int, MemoryLocation> value_addr;
+	std::vector<MemoryLocation> value_addr;
 	uint8_t EEPROM_Read(uint8_t address);
 	void EEPROM_Write(uint8_t address, uint8_t data);
 

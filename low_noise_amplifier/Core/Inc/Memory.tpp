@@ -2,7 +2,7 @@
 
 
 template<typename T>
-T Memory::getValue(int key) {
+T Memory::getValue(uint8_t key) {
 	MemoryLocation location;
 	location = value_addr[key];
 	return (this->EEPROM_byte_Read<T>(location.address));
@@ -10,7 +10,7 @@ T Memory::getValue(int key) {
 
 
 template<typename T>
-void Memory::setValue(int key, T value) {
+void Memory::setValue(uint8_t key, T value) {
     MemoryLocation location;
     if (value_addr.count(key)) {
         location = value_addr[key];
@@ -25,7 +25,7 @@ T Memory::EEPROM_byte_Read(uint8_t address) {
     int size = sizeof(T);
     int i;
 
-    for (i = size - 1; i >= 0; i--) { // Corregido: i >= 0 en lugar de i <= 0
+    for (i = size - 1; i >= 0; i--) {
         if (i < size - 1) {
             HAL_Delay(5);
             data = data << 8;
