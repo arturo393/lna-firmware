@@ -14,7 +14,7 @@
 
 class UartHandler {
 public:
-	UartHandler(const Command &_command, UART_HandleTypeDef *_huart,
+	UartHandler(UART_HandleTypeDef *_huart,
 			GPIO_TypeDef *_data_enable_port, uint16_t _data_enable_pin);
 	~UartHandler();
 
@@ -22,17 +22,16 @@ public:
 	void handleRxData(uint8_t data);
 	bool transmitMessage(const char *message);
 	bool transmitData(uint8_t *data, uint8_t data_bytes);
-	bool receive_it();
+	void wait_for_it_byte();
+	uint8_t getByte();
 	bool isDataReady;
 
 private:
 	UART_HandleTypeDef *huart;
-	Command command;
-	uint8_t uart1_rcv_counter;
 	uint8_t rxData;
 	GPIO_TypeDef *data_enable_port;
 	uint16_t data_enable_pin;
-	bool start_byte;
+
 	static constexpr uint8_t LTEL_START_MARK = 0x7e;
 	static constexpr uint8_t LTEL_END_MARK = 0x7f;
 	static constexpr uint8_t MODULE_ADDR = 0x08;

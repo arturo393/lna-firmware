@@ -127,7 +127,7 @@ int main(void) {
 	 */
 
 	Command command = Command(MODULE_FUNCTION,MODULE_ADDRESS);
-	UartHandler myUart(command,&huart1, DE_GPIO_Port, DE_Pin);
+	UartHandler myUart(&huart1, DE_GPIO_Port, DE_Pin);
 
 	Memory eeeprom = Memory(&hi2c1);
 	uint8_t lna_att_key = eeeprom.createKey(LNA_ATT_ADDR, sizeof(uint8_t));
@@ -171,7 +171,8 @@ int main(void) {
 	}
 
 	myUart.transmitMessage("LNA init\n\r");
-	myUart.receive_it();
+	myUart.wait_for_it_byte();
+
 	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
@@ -599,7 +600,10 @@ static void MX_GPIO_Init(void) {
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 // Read received data from UART1
-	myUart.receive_it();
+	uint8_t myBute = myUart.getByte();
+	command.checkByte(myBute);
+	myUart.wait_for_it_byte();
+
 
 }
 
