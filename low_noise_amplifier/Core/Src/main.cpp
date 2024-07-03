@@ -70,6 +70,8 @@ bool isPrintEnable = false;
 
 uint32_t led_counter = 0;
 
+#define MODULE_FUNCTION 0x09
+#define MODULE_ADDRESS 0x08
 
 /* USER CODE END PV */
 
@@ -124,9 +126,9 @@ int main(void) {
 	 * adcHandler
 	 */
 
-	UartHandler myUart(&huart1, DE_GPIO_Port, DE_Pin, 25, 100);
+	Command command = Command(MODULE_FUNCTION,MODULE_ADDRESS,25,100);
+	UartHandler myUart(command,&huart1, DE_GPIO_Port, DE_Pin);
 
-	Command command = Command();
 	Memory eeeprom = Memory(&hi2c1);
 	uint8_t lna_att_key = eeeprom.createKey(LNA_ATT_ADDR, sizeof(uint8_t));
 	uint8_t pout_adc_max_key = eeeprom.createKey(POUT_ADC_MAX_ADDR,

@@ -7,16 +7,13 @@
 
 #include "UartHandler.hpp"
 
-UartHandler::UartHandler(UART_HandleTypeDef *_huart,
-		GPIO_TypeDef *_data_enable_port, uint16_t _data_enable_pin,
-		uint8_t _max_rx_buffer_size, uint8_t _max_tx_buffer_size) :
-		huart(_huart), max_rx_buffer_size(_max_rx_buffer_size), // Enforce max size
-		max_tx_buffer_size(_max_tx_buffer_size), // No validation assumed for TX
-		rx_buffer(new uint8_t[max_rx_buffer_size]), tx_buffer(
-				new uint8_t[max_tx_buffer_size]), data_enable_port(
-				_data_enable_port), data_enable_pin(_data_enable_pin) // Initialize with passed value
-{
+UartHandler::UartHandler(const Command &_command, UART_HandleTypeDef *_huart,
+		GPIO_TypeDef *_data_enable_port, uint16_t _data_enable_pin) {
 
+	command = _command;
+	huart = _huart;
+	data_enable_port = _data_enable_port;
+	data_enable_pin = _data_enable_pin; // Initialize with passed value
 	clearBuffers();
 }
 
@@ -26,13 +23,11 @@ UartHandler::~UartHandler() {
 }
 
 void UartHandler::clearBuffers() {
-	memset(rx_buffer, 0, max_rx_buffer_size);
-	memset(tx_buffer, 0, max_tx_buffer_size);
+
 	uart1_rcv_counter = 0;
-	tx_buffer_size = 0;
+
 	rxData = 0;
 	isDataReady = false;
-	command = 0;
 	start_byte = false;
 }
 
