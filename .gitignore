@@ -67,4 +67,7 @@ ctrlp.root
 *.html
 
 *.cyclo
-.settings/
+**/.settings/*
+**/Debug/
+.project
+.metadata/*
