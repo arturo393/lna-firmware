@@ -11,12 +11,11 @@
 #include "main.h"
 
 class UartHandler {
-public:
-	UartHandler();
-	~UartHandler();
-	virtual bool transmitMessage(const char *message);
-	virtual bool transmitData(uint8_t *data, uint8_t data_bytes);
-	virtual void wait_for_it_byte();
+protected:
+	virtual ~UartHandler()=0;
+	virtual bool transmitMessage(const char *message)=0;
+	virtual bool transmitData(uint8_t *data, uint8_t data_bytes)=0;
+	virtual void wait_for_it_byte()=0;
 };
 
 #endif /* INC_UARTHANDLER_HPP_ */

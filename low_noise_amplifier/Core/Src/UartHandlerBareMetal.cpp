@@ -7,6 +7,7 @@
 
 #include "UartHandlerBareMetal.hpp"
 
+
 void UartHandlerBareMetal::init(USART_TypeDef *USART,
 		GPIO_TypeDef *_data_enable_port, uint16_t _data_enable_pin) {
 	_data_enable_port = data_enable_port;
@@ -15,7 +16,10 @@ void UartHandlerBareMetal::init(USART_TypeDef *USART,
 	uart1_init(16000000, 9600);
 }
 
-bool UartHandlerBareMetal::transmitData(uint8_t *data, uint8_t data_bytes) {
+bool transmitMessage(const char *message){
+	return (true);
+}
+bool UartHandlerBareMetal::transmitData(uint8_t *data, uint8_t data_bytes){
 	HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_SET);
 	if (HAL_UART_Transmit(huart, data, data_bytes,
 	HAL_MAX_DELAY) == HAL_OK) {
@@ -158,7 +162,7 @@ char UartHandlerBareMetal::uart1_1byte_read(void) {
 		return '\0';
 }
 
-void UartHandlerBareMetal::uart1_send_str(volatile char *str) {
+void UartHandlerBareMetal::uart1_send_str(const char *str) {
 	uint8_t i;
 	for (i = 0; str[i] != '\0'; i++)
 		uart1_write(str[i]);

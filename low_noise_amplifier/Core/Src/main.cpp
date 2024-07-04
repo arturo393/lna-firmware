@@ -74,7 +74,6 @@ uint32_t led_counter = 0;
 ProtocolMessage protocolMessage = ProtocolMessage(MODULE_FUNCTION,
 		MODULE_ADDRESS);
 //UartHandler myUart(&huart1, DE_GPIO_Port, DE_Pin);
-UartHandlerBareMetal uartBareMetal = UartHandlerBareMetal();
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -127,7 +126,12 @@ int main(void) {
 	 * gpio handler ok
 	 * adcHandler
 	 */
-	uartBareMetal.init(USART1,DE_GPIO_Port,DE_Pin);
+
+	UartHandlerBareMetal uartBareMetal = UartHandlerBareMetal();
+	uartBareMetal.init(USART1, DE_GPIO_Port, DE_Pin);
+	uartBareMetal.uart1_send_str("LNA init");
+
+
 
 	Memory eeeprom = Memory(&hi2c1);
 	uint8_t lna_att_key = eeeprom.createKey(LNA_ATT_ADDR, sizeof(uint8_t));
