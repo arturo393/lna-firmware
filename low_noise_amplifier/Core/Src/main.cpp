@@ -22,20 +22,18 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+
+
 #include "utils.h"
-#include "i2c1.h"
-#include "stdbool.h"
 #include "lna.h"
 #include <UartHandler.hpp>
-#include <Command.hpp>
 #include <Gpio.hpp>
 #include <GpioHandler.hpp>
 #include <RfAttenuator.hpp>
 #include <AdcHandler.hpp>
 #include <Memory.hpp>
+#include <ProtocolMessage.hpp>
+#include <UartHandlerBareMetal.hpp>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -73,6 +71,10 @@ uint32_t led_counter = 0;
 #define MODULE_FUNCTION 0x09
 #define MODULE_ADDRESS 0x08
 
+ProtocolMessage protocolMessage = ProtocolMessage(MODULE_FUNCTION,
+		MODULE_ADDRESS);
+//UartHandler myUart(&huart1, DE_GPIO_Port, DE_Pin);
+UartHandlerBareMetal uartBareMetal = UartHandlerBareMetal();
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -125,9 +127,7 @@ int main(void) {
 	 * gpio handler ok
 	 * adcHandler
 	 */
-
-	Command command = Command(MODULE_FUNCTION,MODULE_ADDRESS);
-	UartHandler myUart(&huart1, DE_GPIO_Port, DE_Pin);
+	uartBareMetal.init(USART1,DE_GPIO_Port,DE_Pin);
 
 	Memory eeeprom = Memory(&hi2c1);
 	uint8_t lna_att_key = eeeprom.createKey(LNA_ATT_ADDR, sizeof(uint8_t));
@@ -151,7 +151,8 @@ int main(void) {
 	AdcHandler voltage_input(&hadc1, ADC_CHANNEL_7);
 	AdcHandler agc_level(&hadc1, ADC_CHANNEL_8);
 	GpioHandler gpioHandler(4, 4);
-	RFAttenuator rfAttenuator(gpioHandler, data_pin, clock_pin, le_pin);
+
+	RFAttenuator rfAttenuator(&gpioHandler, &data_pin, &clock_pin, &le_pin);
 
 	uint8_t attenuation_flag = eeeprom.getValue<uint8_t>(att_flag_key);
 
@@ -170,15 +171,15 @@ int main(void) {
 		eeeprom.setValue(POUT_ADC_MAX_ADDR, POUT_ADC_MAX);
 	}
 
-	myUart.transmitMessage("LNA init\n\r");
-	myUart.wait_for_it_byte();
+
+//	myUart.transmitMessage("LNA init\n\r");
+//	myUart.wait_for_it_byte();
 
 	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
 
 	/* USER CODE BEGIN 2 */
-
 
 	/* USER CODE END 2 */
 
@@ -202,9 +203,7 @@ int main(void) {
 		adcRredings[3] = agc_level.getChannelValue();
 
 		/* USER CODE BEGIN 3 */
-		if (myUart.isDataReady){
 
-		}
 		/*
 		 if (myUart.command == command.getQueryParameterLTEL()) {
 		 //lna = calulate_lna_real_values(adcResultsDMA);
@@ -600,10 +599,8 @@ static void MX_GPIO_Init(void) {
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 // Read received data from UART1
-	uint8_t myBute = myUart.getByte();
-	command.checkByte(myBute);
-	myUart.wait_for_it_byte();
-
+//	protocolMessage.checkByte(myUart.getByte());
+//	myUart.wait_for_it_byte();
 
 }
 

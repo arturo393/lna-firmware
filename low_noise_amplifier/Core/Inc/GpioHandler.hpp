@@ -14,7 +14,7 @@
 class GpioHandler {
 public:
 
-	GpioHandler(int _ports = 0, int _pins = 0);
+	GpioHandler(uint8_t _ports = 0, uint8_t _pins = 0);
 	virtual ~GpioHandler();
 	void turnOn(Gpio gpio);
 	void turnOff(Gpio gpio);
@@ -22,8 +22,8 @@ public:
 
 private:
 	void switch_state(Gpio gpio, GPIO_PinState state);
-	int ports;
-	int pins;
+	uint8_t ports;
+	uint8_t pins;
 };
 
 #endif /* SRC_GPIOCONTROLLER_HPP_ */

@@ -11,6 +11,7 @@
 #include "main.h"
 
 class Gpio {
+
 public:
 	Gpio(GPIO_TypeDef* _port = NULL , uint16_t _pin = 0);
 	GPIO_TypeDef* get_port();

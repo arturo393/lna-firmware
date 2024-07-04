@@ -8,15 +8,15 @@
 #include "main.h"
 #include <cstring>
 #include <vector>
+
 // Abstract class Function
-class Command {
+class ProtocolMessage {
 
 public:
-	Command(uint8_t _module_function, uint8_t _module_id);
+	ProtocolMessage(uint8_t _module_function, uint8_t _module_id);
 	// Virtual destructor (optional)
-	virtual ~Command();
+	virtual ~ProtocolMessage();
 
-	virtual void encode();
 	// Getters and Setters for private members
 	uint8_t getModuleFunction() {
 		return(module_function);

@@ -6,9 +6,9 @@
  *      Author: artur
  */
 
-#include "Command.hpp" // Include the header file
+#include <ProtocolMessage.hpp> // Include the header file
 
-Command::Command(uint8_t _module_function, uint8_t _module_id) {
+ProtocolMessage::ProtocolMessage(uint8_t _module_function, uint8_t _module_id) {
     module_function = _module_function;
     module_id = _module_id;
     max_message_size = 255; // Enforce max size
@@ -16,11 +16,11 @@ Command::Command(uint8_t _module_function, uint8_t _module_id) {
     command_id = 0;
 }
 
-Command::~Command() {
+ProtocolMessage::~ProtocolMessage() {
 
 } // Empty destructor (optional)
 
-void Command::checkByte(uint8_t number) {
+void ProtocolMessage::checkByte(uint8_t number) {
   if (listening) {
     message.push_back(number);
     if (number == getLTELEndMark()) {
@@ -38,4 +38,5 @@ void Command::checkByte(uint8_t number) {
     }
   }
 }
+
 
