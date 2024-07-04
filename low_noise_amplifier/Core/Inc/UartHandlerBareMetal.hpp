@@ -15,8 +15,8 @@
 
 class UartHandlerBareMetal{
 public:
-	UartHandlerBareMetal(){};
-	virtual ~UartHandlerBareMetal(){};
+	UartHandlerBareMetal(){}
+	~UartHandlerBareMetal(){}
 	void init(USART_TypeDef * USART,GPIO_TypeDef *_data_enable_port,
 	uint16_t _data_enable_pin);
 	bool transmitMessage(const char *message);
