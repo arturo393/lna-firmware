@@ -18,4 +18,6 @@ protected:
 	virtual void wait_for_it_byte()=0;
 };
 
+inline UartHandler::~UartHandler() {}
+
 #endif /* INC_UARTHANDLER_HPP_ */

@@ -16,7 +16,7 @@ void UartHandlerBareMetal::init(USART_TypeDef *USART,
 	uart1_init(16000000, 9600);
 }
 
-bool transmitMessage(const char *message){
+bool UartHandlerBareMetal::transmitMessage(const char *message){
 	return (true);
 }
 bool UartHandlerBareMetal::transmitData(uint8_t *data, uint8_t data_bytes){
