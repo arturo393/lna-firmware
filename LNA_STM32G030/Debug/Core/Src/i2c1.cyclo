@@ -1,5 +1,0 @@
-../Core/Src/i2c1.c:10:6:i2c1_init	1
-../Core/Src/i2c1.c:68:6:i2c1_byteReceive	4
-../Core/Src/i2c1.c:89:6:i2c1_byteTransmit	4
-../Core/Src/i2c1.c:105:6:i2c1_start	3
-../Core/Src/i2c1.c:128:6:i2c1_scanner	5
