@@ -129,7 +129,7 @@ int main(void) {
 
 	UartHandlerBareMetal uartBareMetal = UartHandlerBareMetal();
 	uartBareMetal.init(USART1, DE_GPIO_Port, DE_Pin);
-	uartBareMetal.uart1_send_str("LNA init");
+	uartBareMetal.transmitMessage("LNA init");
 
 
 

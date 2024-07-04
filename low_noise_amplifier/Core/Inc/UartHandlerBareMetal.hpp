@@ -13,15 +13,15 @@
 #include <UartHandler.hpp>
 #include "main.h"
 
-class UartHandlerBareMetal{
+class UartHandlerBareMetal : UartHandler{
 public:
-	UartHandlerBareMetal(){}
+	UartHandlerBareMetal(){rxdata = false;}
 	~UartHandlerBareMetal(){}
 	void init(USART_TypeDef * USART,GPIO_TypeDef *_data_enable_port,
 	uint16_t _data_enable_pin);
-	bool transmitMessage(const char *message);
-	bool transmitData(uint8_t *data, uint8_t data_bytes);
-	void wait_for_it_byte();
+	bool transmitMessage(const char *message) override;
+	bool transmitData(uint8_t *data, uint8_t data_bytes) override;
+	void wait_for_it_byte() override;
 	uint8_t getByte();
 	void uart1_send_str(const char *str);
 

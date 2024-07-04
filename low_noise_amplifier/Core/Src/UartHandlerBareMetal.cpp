@@ -35,7 +35,7 @@ bool UartHandlerBareMetal::transmitData(uint8_t *data, uint8_t data_bytes){
 
 /* Read received data from UART1 */
 void UartHandlerBareMetal::wait_for_it_byte() {
-	HAL_UART_Receive_IT(huart, &rxData, 1);
+	//HAL_UART_Receive_IT(huart, &rxData, 1);
 }
 
 uint8_t UartHandlerBareMetal::getByte() {
@@ -157,7 +157,5 @@ char UartHandlerBareMetal::uart1_1byte_read(void) {
 		return '\0';
 }
 
-
-}
 
 
