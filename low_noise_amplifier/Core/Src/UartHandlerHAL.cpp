@@ -7,16 +7,14 @@
 
 #include "UartHandlerHAL.hpp"
 
-UartHandlerHAL::UartHandler(UART_HandleTypeDef *_huart,
-		GPIO_TypeDef *_data_enable_port, uint16_t _data_enable_pin) {
 
+void UartHandlerHAL::init(UART_HandleTypeDef *_huart,
+				GPIO_TypeDef *_data_enable_port, uint16_t _data_enable_pin){
 	huart = _huart;
 	data_enable_port = _data_enable_port;
-	data_enable_pin = _data_enable_pin; // Initialize with passed value
-	clearBuffers();
-}
+	data_enable_pin = _data_enable_pin;
+	rx_byte = 0;
 
-UartHandlerHAL::~UartHandler() {
 }
 
 bool UartHandlerHAL::transmitData(uint8_t *data, uint8_t data_bytes) {
@@ -32,10 +30,9 @@ bool UartHandlerHAL::transmitData(uint8_t *data, uint8_t data_bytes) {
 
 /* Read received data from UART1 */
 void UartHandlerHAL::wait_for_it_byte() {
-	HAL_UART_Receive_IT(huart, &rxData, 1);
+	HAL_UART_Receive_IT(huart,&rx_byte,1);
 }
 
-uint8_t UartHandlerHAL::getByte() {
-	return (rxData);
+uint8_t UartHandlerHAL::getByte(){
+	return (rx_byte);
 }
-
