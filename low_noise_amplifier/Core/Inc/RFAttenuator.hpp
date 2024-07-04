@@ -13,16 +13,14 @@
 
 class RFAttenuator {
 public:
-	RFAttenuator(const GpioHandler &_gpioHandler, const Gpio & _data_pin, const Gpio & _clock_pin, const Gpio &_le_pin);
-	//RFAttenuator(GpioHandler _gpioHandler);
+	RFAttenuator(GpioHandler* _gpioHandler, Gpio* _data_pin, Gpio* _clock_pin, Gpio* _le_pin);
 	virtual ~RFAttenuator();
-
 	void attenuate(int value);
 private:
-	GpioHandler gpioHandler;
-	Gpio data_pin;
-	Gpio clock_pin;
-	Gpio le_pin;
+	GpioHandler *gpioHandler;
+	Gpio *data_pin;
+	Gpio *clock_pin;
+	Gpio *le_pin;
 };
 
 #endif /* SRC_RFATTENUATOR_HPP_ */

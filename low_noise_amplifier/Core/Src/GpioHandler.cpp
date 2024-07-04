@@ -8,7 +8,7 @@
 #include "GpioHandler.hpp"
 
 
-GpioHandler::GpioHandler(int _ports, int _pins){
+GpioHandler::GpioHandler(uint8_t _ports, uint8_t _pins){
 	ports = _ports;
 	pins = _pins;
 	// TODO Auto-generated constructor stub
