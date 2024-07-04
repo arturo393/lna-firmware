@@ -16,15 +16,18 @@ void UartHandlerBareMetal::init(USART_TypeDef *USART,
 	uart1_init(16000000, 9600);
 }
 
-bool transmitMessage(const char *message){
-	return (true);
+bool UartHandlerBareMetal::transmitMessage(const char *message){
+	uint8_t i;
+	for (i = 0; message[i] != '\0'; i++)
+		uart1_write(message[i]);
+
+	return true;
 }
 bool UartHandlerBareMetal::transmitData(uint8_t *data, uint8_t data_bytes){
 	HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_SET);
-	if (HAL_UART_Transmit(huart, data, data_bytes,
-	HAL_MAX_DELAY) == HAL_OK) {
-		return (true);
-		HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_RESET);
+	if (data_bytes > 0) {
+		for (int i = 0; i < data_bytes; i++)
+			uart1_write(data[i]);
 	}
 	HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_RESET);
 	return (false);
@@ -98,14 +101,6 @@ void UartHandlerBareMetal::uart1_init(uint32_t pclk, uint32_t baud_rate) {
 	/* transmitter enable*/
 	USART1->CR1 = USART_CR1_TE | USART_CR1_RE;
 
-	/* enable FIFO */
-	//SET_BIT(USART1->CR2, USART_CR1_FIFOEN);
-	/* enable Rx timeout */
-	//SET_BIT(USART1->CR2, USART_CR2_RTOEN);
-	/**/
-	//MODIFY_REG(USART1->RTOR,USART_RTOR_RTO,100);
-	/*set length */
-	/* select */
 	SET_BIT(USART1->CR1, USART_CR1_RXNEIE_RXFNEIE);
 	NVIC_EnableIRQ(USART1_IRQn);
 	SET_BIT(USART1->CR1, USART_CR1_UE);
@@ -162,17 +157,7 @@ char UartHandlerBareMetal::uart1_1byte_read(void) {
 		return '\0';
 }
 
-void UartHandlerBareMetal::uart1_send_str(const char *str) {
-	uint8_t i;
-	for (i = 0; str[i] != '\0'; i++)
-		uart1_write(str[i]);
-}
 
-void UartHandlerBareMetal::uart1_write_frame(char *str, uint8_t len) {
-	if (len > 0) {
-		for (int i = 0; i < len; i++)
-			uart1_write(str[i]);
-	}
 }
 
 

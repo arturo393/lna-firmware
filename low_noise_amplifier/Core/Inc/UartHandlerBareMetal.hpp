@@ -13,20 +13,20 @@
 #include <UartHandler.hpp>
 #include "main.h"
 
-class UartHandlerBareMetal :  UartHandler {
+class UartHandlerBareMetal{
 public:
 	UartHandlerBareMetal(){};
 	virtual ~UartHandlerBareMetal(){};
 	void init(USART_TypeDef * USART,GPIO_TypeDef *_data_enable_port,
 	uint16_t _data_enable_pin);
-	bool transmitMessage(const char *message) override;
-	bool transmitData(uint8_t *data, uint8_t data_bytes) override;
-	void wait_for_it_byte() override;
+	bool transmitMessage(const char *message);
+	bool transmitData(uint8_t *data, uint8_t data_bytes);
+	void wait_for_it_byte();
 	uint8_t getByte();
 	void uart1_send_str(const char *str);
 
 private:
-	UART_HandleTypeDef *huart;
+	USART_TypeDef * _USART;
 	uint8_t rxData;
 	GPIO_TypeDef *data_enable_port;
 	uint16_t data_enable_pin;
@@ -38,6 +38,7 @@ private:
 	void uart1_read(char *data, uint8_t size);
 	char uart1_1byte_read(void);
 	void uart1_write_frame(char *str, uint8_t len);
+
 	//void uart1_send_str(volatile char *str);
 };
 
