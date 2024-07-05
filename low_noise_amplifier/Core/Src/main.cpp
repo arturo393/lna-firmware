@@ -194,12 +194,7 @@ int main(void) {
 //
 	uint16_t adcRredings[100];
 
-	std::vector<uint8_t> vr;
-	vr.push_back(1);
-	vr.push_back(2);
-	vr.push_back(3);
-
-	while (1) {
+	while (true) {
 
 
 		/* USER CODE END WHILE */
