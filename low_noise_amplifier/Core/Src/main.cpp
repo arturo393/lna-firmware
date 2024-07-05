@@ -60,8 +60,6 @@ I2C_HandleTypeDef hi2c1;
 
 IWDG_HandleTypeDef hiwdg;
 
-UART_HandleTypeDef huart1;
-
 /* USER CODE BEGIN PV */
 bool adcDataReady = false;
 bool isPrintEnable = false;
@@ -73,6 +71,7 @@ uint32_t led_counter = 0;
 
 ProtocolMessage protocolMessage = ProtocolMessage(MODULE_FUNCTION,
 		MODULE_ADDRESS);
+UartHandlerBareMetal uartBareMetal = UartHandlerBareMetal();
 //UartHandler myUart(&huart1, DE_GPIO_Port, DE_Pin);
 /* USER CODE END PV */
 
@@ -81,7 +80,6 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_ADC1_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
@@ -90,6 +88,7 @@ static void MX_IWDG_Init(void);
 /* USER CODE BEGIN 0 */
 
 struct Lna lna;
+char rx_data[100];
 /* USER CODE END 0 */
 
 /**
@@ -117,7 +116,7 @@ int main(void) {
 	/* USER CODE BEGIN SysInit */
 	MX_GPIO_Init();
 	MX_ADC1_Init();
-	MX_USART1_UART_Init();
+//	MX_USART1_UART_Init();
 	MX_I2C1_Init();
 //	MX_IWDG_Init();
 	/* memory ok
@@ -127,11 +126,9 @@ int main(void) {
 	 * adcHandler
 	 */
 
-	UartHandlerBareMetal uartBareMetal = UartHandlerBareMetal();
+
 	uartBareMetal.init(USART1, DE_GPIO_Port, DE_Pin);
 	uartBareMetal.transmitMessage("LNA init");
-
-
 
 	Memory eeeprom = Memory(&hi2c1);
 	uint8_t lna_att_key = eeeprom.createKey(LNA_ATT_ADDR, sizeof(uint8_t));
@@ -195,18 +192,26 @@ int main(void) {
 	uint32_t lna_print_counter = HAL_GetTick();
 //	set_attenuation_to_bda4601(eeprom_1byte_read(LNA_ATT_ADDR), 5);
 //
-	uint16_t adcRredings[4];
+	uint16_t adcRredings[100];
+
+	std::vector<uint8_t> vr;
+	vr.push_back(1);
+	vr.push_back(2);
+	vr.push_back(3);
 
 	while (1) {
 
-		/* USER CODE END WHILE */
 
+		/* USER CODE END WHILE */
 		adcRredings[0] = rf_power_out.getChannelValue();
 		adcRredings[1] = current_consumption.getChannelValue();
 		adcRredings[2] = voltage_input.getChannelValue();
 		adcRredings[3] = agc_level.getChannelValue();
-
+		uartBareMetal.uart1_read(rx_data,100);
 		/* USER CODE BEGIN 3 */
+	    // 'Receive register not empty' interrupt.
+
+
 
 		/*
 		 if (myUart.command == command.getQueryParameterLTEL()) {
@@ -500,53 +505,16 @@ static void MX_IWDG_Init(void) {
 
 }
 
-/**
- * @brief USART1 Initialization Function
- * @param None
- * @retval None
- */
-/**
- * @brief USART1 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_USART1_UART_Init(void) {
 
-	/* USER CODE BEGIN USART1_Init 0 */
+void UART_IRQHandler( void ) {
+	uint8_t data;
+    // 'Receive register not empty' interrupt.
+    if ( USART1->ISR & USART_ISR_RXNE_RXFNE ) {
+      // Copy new data into the buffer.
+      data = USART1->RDR;
+    }
 
-	/* USER CODE END USART1_Init 0 */
-
-	/* USER CODE BEGIN USART1_Init 1 */
-
-	/* USER CODE END USART1_Init 1 */
-	huart1.Instance = USART1;
-	huart1.Init.BaudRate = 9600;
-	huart1.Init.WordLength = UART_WORDLENGTH_8B;
-	huart1.Init.StopBits = UART_STOPBITS_1;
-	huart1.Init.Parity = UART_PARITY_NONE;
-	huart1.Init.Mode = UART_MODE_TX_RX;
-	huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-	huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-	huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-	huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-	huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-	if (HAL_UART_Init(&huart1) != HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8)
-			!= HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8)
-			!= HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK) {
-		Error_Handler();
-	}
-	/* USER CODE BEGIN USART1_Init 2 */
-
-	/* USER CODE END USART1_Init 2 */
+	protocolMessage.setCommandId(data);
 
 }
 
@@ -600,13 +568,6 @@ static void MX_GPIO_Init(void) {
 }
 
 /* USER CODE BEGIN 4 */
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-// Read received data from UART1
-//	protocolMessage.checkByte(myUart.getByte());
-//	myUart.wait_for_it_byte();
-
-}
 
 /* USER CODE END 4 */
 

@@ -24,6 +24,7 @@ public:
 	void wait_for_it_byte() override;
 	uint8_t getByte();
 	void uart1_send_str(const char *str);
+	void uart1_read(char *data, uint8_t size);
 
 private:
 	USART_TypeDef * _USART;
@@ -35,7 +36,7 @@ private:
 	void uart1_gpio_init();
 	void uart1_init(uint32_t pclk, uint32_t baud_rate);
 	void uart1_write(char ch);
-	void uart1_read(char *data, uint8_t size);
+
 	char uart1_1byte_read(void);
 	void uart1_write_frame(char *str, uint8_t len);
 

@@ -6,8 +6,7 @@
  */
 
 #include "UartHandlerHAL.hpp"
-
-
+#ifdef UART_HAL
 void UartHandlerHAL::init(UART_HandleTypeDef *_huart,
 				GPIO_TypeDef *_data_enable_port, uint16_t _data_enable_pin){
 	huart = _huart;
@@ -36,3 +35,5 @@ void UartHandlerHAL::wait_for_it_byte() {
 uint8_t UartHandlerHAL::getByte(){
 	return (rx_byte);
 }
+
+#endif

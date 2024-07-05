@@ -8,10 +8,12 @@
 #ifndef INC_UARTHANDLERHAL_HPP_
 #define INC_UARTHANDLERHAL_HPP_
 
+#ifdef UART_HAL
 #include <Command.hpp>
 #include <cstring>
 #include <UartHandler.hpp>
 #include "main.h"
+
 
 class UartHandlerHAL : UartHandler {
 public:
@@ -27,5 +29,7 @@ private:
 	uint16_t data_enable_pin;
 	uint8_t rx_byte;
 };
+
+#endif
 
 #endif /* INC_UARTHANDLER_HPP_ */

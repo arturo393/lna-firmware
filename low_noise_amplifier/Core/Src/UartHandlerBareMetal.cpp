@@ -21,7 +21,7 @@ bool UartHandlerBareMetal::transmitMessage(const char *message){
 	for (i = 0; message[i] != '\0'; i++)
 		uart1_write(message[i]);
 
-	return true;
+	return (true);
 }
 bool UartHandlerBareMetal::transmitData(uint8_t *data, uint8_t data_bytes){
 	HAL_GPIO_WritePin(data_enable_port, data_enable_pin, GPIO_PIN_SET);
@@ -102,7 +102,7 @@ void UartHandlerBareMetal::uart1_init(uint32_t pclk, uint32_t baud_rate) {
 	USART1->CR1 = USART_CR1_TE | USART_CR1_RE;
 
 	SET_BIT(USART1->CR1, USART_CR1_RXNEIE_RXFNEIE);
-	NVIC_EnableIRQ(USART1_IRQn);
+	//NVIC_EnableIRQ(USART1_IRQn);
 	SET_BIT(USART1->CR1, USART_CR1_UE);
 }
 
@@ -121,28 +121,33 @@ void UartHandlerBareMetal::uart1_write(char ch) {
 }
 
 void UartHandlerBareMetal::uart1_read(char *data, uint8_t size) {
-	bool override = READ_BIT(USART1->ISR, USART_ISR_ORE);
-	bool data_present = READ_BIT(USART1->ISR, USART_ISR_RXNE_RXFNE);
-	bool busy = READ_BIT(USART1->ISR, USART_ISR_BUSY);
-	bool timeout = false;
-	if (size > 1) {
-		for (int i = 0; (i < size - 1); i++) {
-			while ((!data_present && !override && !timeout)) {
-				if (rxfne > 1000)
-					timeout = true;
-				else
-					rxfne++;
-			}
-			data[i] = USART1->RDR;
-			if (override)
-				SET_BIT(USART1->ICR, USART_ICR_ORECF);
-		}
-		rxfne = 0;
-	} else {
-		while (!READ_BIT(USART1->ISR, USART_ISR_RXNE_RXFNE)) {
-		}
-		data[0] = USART1->RDR;
-	}
+	  // Check for overrun error (optional)
+	uint32_t MAX_TIMEOUT= 10000;
+	  bool override = READ_BIT(USART1->ISR, USART_ISR_ORE);
+	  if (override) {
+	    // Handle overrun error (e.g., clear flag)
+	    SET_BIT(USART1->ICR, USART_ICR_ORECF);
+	  }
+
+	  // Loop to read data byte-by-byte
+	  for (int i = 0; i < size; i++) {
+	    // Set timeout counter
+	    uint32_t timeout_counter = 0;
+
+	    // Wait for RXNE flag with timeout
+	    while (!READ_BIT(USART1->ISR, USART_ISR_RXNE_RXFNE) && timeout_counter < MAX_TIMEOUT) {
+	      timeout_counter++;
+	    }
+
+	    // Check for timeout
+	    if (timeout_counter >= MAX_TIMEOUT) {
+	      // Handle timeout (e.g., return error code)
+	      return; // Replace with your timeout handling logic
+	    }
+
+	    // Read the received byte from the Data Register
+	    data[i] = USART1->RDR;
+	  }
 }
 
 char UartHandlerBareMetal::uart1_1byte_read(void) {
