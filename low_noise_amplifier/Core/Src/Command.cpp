@@ -80,13 +80,13 @@ void Command::checkByte(uint8_t number) {
 }
 
 bool Command::checkCRC() {
-  #define CRC_BYTE_1 3
-  #define CRC_BYTE_2 2
+  #define CRC_BYTE_1_BACKWARD 3
+  #define CRC_BYTE_2_BACKWARD 2
 
 
 	uint16_t crc;
 	uint8_t testframe[2];
-  uint8_t crc_frame[2] = { message[message.size() - CRC_BYTE_1], message[message.size() - CRC_BYTE_2]};
+  uint8_t crc_frame[2] = { message[message.size() - CRC_BYTE_1_BACKWARD], message[message.size() - CRC_BYTE_2_BACKWARD]};
 
 	crc = calculateCRC(1, 3);
 	memcpy(testframe, &crc, 2);
