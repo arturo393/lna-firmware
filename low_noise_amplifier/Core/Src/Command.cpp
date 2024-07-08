@@ -68,7 +68,7 @@ void Command::checkByte(uint8_t number) {
       }
     }
     if (message.size() >= max_message_size) {
-      reset()
+      reset();
     }
   } else {
     if (number == getLTELStartMark()) {
