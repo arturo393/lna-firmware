@@ -115,8 +115,13 @@ uint16_t CommandMessage::calculateCRC(uint8_t start, uint8_t end) {
 	return (crc);
 }
 
-bool CommandMessage::composeMessage(std::vector<uint8_t> data) {
-  uint8_t size = data.size();
+bool CommandMessage::composeMessage(std::vector<uint8_t>* data) {
+  uint8_t size;
+  if (data == nullptr) {
+    size = 0;
+  } else {
+    size = data->size();
+  }
   uint16_t crc;
   if (command_id == 0) return false;
   message.clear();
@@ -130,7 +135,7 @@ bool CommandMessage::composeMessage(std::vector<uint8_t> data) {
 
   message.push_back(size);
   if (size > 0) {
-    message.insert(message.end(), data.begin(), data.end());
+    message.insert(message.end(), data->begin(), data->end());
   }
 
   crc = calculateCRC(1, size);
@@ -140,4 +145,8 @@ bool CommandMessage::composeMessage(std::vector<uint8_t> data) {
   message.push_back(getLTELEndMark());
 
   return true;
+}
+
+bool CommandMessage::composeMessage(){
+  return composeMessage(nullptr);
 }

@@ -99,7 +99,8 @@ public:
 
     void checkByte(uint8_t number);
     std::vector<uint8_t> getData();
-    bool composeMessage(std::vector<uint8_t> data);
+    bool composeMessage(std::vector<uint8_t>* data);
+    bool composeMessage();
 
 private:
     void setVars();
