@@ -6,19 +6,19 @@
  *      Author: artur
  */
 
-#include "Command.hpp" // Include the header file
+#include <CommandMessage.hpp> // Include the header file
 
-Command::Command(uint8_t _module_function, uint8_t _module_id, uint8_t max_size)
+CommandMessage::CommandMessage(uint8_t _module_function, uint8_t _module_id, uint8_t max_size)
     : module_function(_module_function), module_id(_module_id), max_message_size(max_size) {
     reset(true);
 }
 
-Command::Command(uint8_t _module_function, uint8_t _module_id)
-    : Command(_module_function, _module_id, 255) {}
+CommandMessage::CommandMessage(uint8_t _module_function, uint8_t _module_id)
+    : CommandMessage(_module_function, _module_id, 255) {}
 
-Command::~Command() {}
+CommandMessage::~CommandMessage() {}
 
-void Command::setVars() {
+void CommandMessage::setVars() {
   #define MODULE_FUNCTION_BYTE 1
   #define MODULE_ID_BYTE 2
   #define COMMAND_BYTE 3
@@ -30,7 +30,7 @@ void Command::setVars() {
   module_function = message[MODULE_FUNCTION_BYTE];
 }
 
-std::vector<uint8_t> Command::getData(){
+std::vector<uint8_t> CommandMessage::getData(){
   #define DATA_LENGTH_INDEX 5
   #define DATA_INDEX 6
 
@@ -41,7 +41,7 @@ std::vector<uint8_t> Command::getData(){
   return std::vector<uint8_t>(message.begin() + DATA_INDEX, message.begin() + end_index);
 }
 
-void Command::reset(bool init) {
+void CommandMessage::reset(bool init) {
   if (!init) {
   module_function = 0;
   module_id = 0;
@@ -53,11 +53,11 @@ void Command::reset(bool init) {
   message.clear();
 }
 
-void Command::reset() {
+void CommandMessage::reset() {
   reset(false);
 }
 
-void Command::checkByte(uint8_t number) {
+void CommandMessage::checkByte(uint8_t number) {
   if (listening) {
     message.push_back(number);
     if (number == getLTELEndMark()) {
@@ -79,7 +79,7 @@ void Command::checkByte(uint8_t number) {
   }
 }
 
-bool Command::checkCRC() {
+bool CommandMessage::checkCRC() {
   #define CRC_BYTE_1_BACKWARD 3
   #define CRC_BYTE_2_BACKWARD 2
 
@@ -96,14 +96,14 @@ bool Command::checkCRC() {
 	return false;
 }
 
-uint16_t Command::calculateCRC(uint8_t start, uint8_t end) {
+uint16_t CommandMessage::calculateCRC(uint8_t start, uint8_t end) {
 	uint8_t b;
 	uint8_t i;
 	uint16_t generator = 0x1021; //divisor is 16bit
 	uint16_t crc = 0;			 // CRC value is 16bit
   uint8_t end_byte = static_cast<uint8_t>(message.size()) - end;
 
-	for (b = start; 1 < end_byte; b++) {
+	for (b = start; b < end_byte; b++) {
 		crc ^= ((uint16_t) (message[b] << 8)); // move byte into MSB of 16bit CRC
 		for (i = 0; i < 8; i++) {
 			if ((crc & 0x8000) != 0) // test for MSB = bit 15

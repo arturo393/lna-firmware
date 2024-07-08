@@ -18,12 +18,6 @@ Lna_t* lna_init() {
 	lna->adcDataReady = false;
 	lna->isPrintEnable = false;
 	lna->led_counter = 0;
-	memset(lna->UART1_rxBuffer, 0, RX_UART1_BUFFLEN);
-	lna->uart1_rcv_counter = 0;
-	lna->rxData = 0;
-	memset(lna->UART1_txBuffer, 0, TX_UART1_BUFFLEN);
-	lna->tx_buffer_size = 0;
-	lna->isDataReady = false;
 	lna->attenuation = 0;
 	lna->gain = 0;
 	lna->pout = 0;

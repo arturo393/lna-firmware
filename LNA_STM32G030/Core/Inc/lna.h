@@ -86,13 +86,6 @@ typedef struct Lna {
 
 	uint32_t led_counter;
 
-	uint8_t UART1_rxBuffer[RX_UART1_BUFFLEN];
-	uint8_t uart1_rcv_counter;
-	uint8_t rxData;
-	uint8_t UART1_txBuffer[TX_UART1_BUFFLEN];
-	uint8_t tx_buffer_size;
-	bool isDataReady;
-
 } Lna_t;
 
 void print_lna_to_uart1();

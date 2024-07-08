@@ -8,7 +8,7 @@
 #ifndef INC_UARTHANDLERHAL_HPP_
 #define INC_UARTHANDLERHAL_HPP_
 
-#include <Command.hpp>
+#include <CommandMessage.hpp>
 #include <cstring>
 #include <UartHandler.hpp>
 #include "main.h"
@@ -24,7 +24,7 @@ public:
 	void wait_for_it_byte() override;
 	uint8_t getByte();
 	void uart1_send_str(const char *str);
-	void uart1_read(char *data, uint8_t size);
+	void uart1_read(char *data, uint8_t size, CommandMessage& c);
 
 private:
 	USART_TypeDef * _USART;

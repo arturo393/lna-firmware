@@ -120,7 +120,7 @@ void UartHandlerBareMetal::uart1_write(char ch) {
 	CLEAR_BIT(GPIOA->ODR, GPIO_ODR_OD15);
 }
 
-void UartHandlerBareMetal::uart1_read(char *data, uint8_t size) {
+void UartHandlerBareMetal::uart1_read(char *data, uint8_t size, CommandMessage& c) {
 	  // Check for overrun error (optional)
 	uint32_t MAX_TIMEOUT= 10000;
 	  bool override = READ_BIT(USART1->ISR, USART_ISR_ORE);
@@ -146,8 +146,9 @@ void UartHandlerBareMetal::uart1_read(char *data, uint8_t size) {
 	    }
 
 	    // Read the received byte from the Data Register
-	    data[i] = USART1->RDR;
+	    c.checkByte(USART1->RDR);
 	  }
+
 }
 
 char UartHandlerBareMetal::uart1_1byte_read(void) {

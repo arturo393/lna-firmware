@@ -194,6 +194,9 @@ int main(void) {
 //
 	uint16_t adcRredings[100];
 
+	CommandMessage c = CommandMessage(MODULE_FUNCTION, MODULE_ADDRESS,100);
+	std::vector<uint8_t> data;
+	int size;
 	while (true) {
 
 
@@ -202,7 +205,15 @@ int main(void) {
 		adcRredings[1] = current_consumption.getChannelValue();
 		adcRredings[2] = voltage_input.getChannelValue();
 		adcRredings[3] = agc_level.getChannelValue();
-		uartBareMetal.uart1_read(rx_data,100);
+		uartBareMetal.uart1_read(rx_data,100, c);
+
+
+		if (c.isReady()) {
+			if (c.getModuleId != MODULE_ADDRESS) continue;
+			if (c.getModuleFunction() != MODULE_FUNCTION) continue;
+
+
+		}
 		/* USER CODE BEGIN 3 */
 	    // 'Receive register not empty' interrupt.
 

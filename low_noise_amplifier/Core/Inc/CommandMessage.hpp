@@ -11,13 +11,11 @@
 // Abstract class Function
 
 
-class Command {
+class CommandMessage {
 public:
-    Command(uint8_t _module_function, uint8_t _module_id, uint8_t max_size);
-    Command(uint8_t _module_function, uint8_t _module_id); // Constructor que delega
-    virtual ~Command();
-
-    virtual void encode();
+    CommandMessage(uint8_t _module_function, uint8_t _module_id, uint8_t max_size);
+    CommandMessage(uint8_t _module_function, uint8_t _module_id); // Constructor que delega
+    virtual ~CommandMessage();
 
     // Getters y Setters
     uint8_t getModuleFunction() const {
@@ -91,6 +89,7 @@ public:
     }
 
     void checkByte(uint8_t number);
+    std::vector<uint8_t> getData();
 
 private:
     void setVars();
@@ -101,7 +100,6 @@ private:
     bool validateChecksum();
     bool checkCRC();
     uint16_t calculateCRC(uint8_t start, uint8_t end);
-    std::vector<uint8_t> getData();
 
     uint8_t max_message_size;
     uint8_t module_function;
