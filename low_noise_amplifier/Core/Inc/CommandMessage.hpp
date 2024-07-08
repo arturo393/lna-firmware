@@ -65,27 +65,32 @@ public:
         return MIN_FRAME_HEADER_SIZE;
     }
 
-    uint8_t getQueryParameterLTEL() const {
-        return QUERY_PARAMETER_LTEL;
-    }
-    uint8_t getQueryParameterSigma() const {
-        return QUERY_PARAMETER_SIGMA;
-    }
-    uint8_t getQueryParameterStr() const {
-        return QUERY_PARAMETER_STR;
-    }
-    uint8_t getQueryADC() const {
-        return QUERY_PARAMETER_ADC;
+    bool isQueryParameterLTEL() const {
+        return (command_id == QUERY_PARAMETER_LTEL);
     }
 
-    uint8_t getSetAttLTEL() const {
-        return SET_ATT_LTEL;
+    bool isQueryParameterSigma() const {
+        return (command_id == QUERY_PARAMETER_SIGMA);
     }
-    uint8_t getSetPoutMax() const {
-        return SET_POUT_MAX;
+
+    bool isQueryParameterStr() const {
+        return (command_id == QUERY_PARAMETER_STR);
     }
-    uint8_t getSetPoutMin() const {
-        return SET_POUT_MIN;
+
+    bool isQueryADC() const {
+        return (command_id == QUERY_PARAMETER_ADC);
+    }
+
+    bool isSetAttLTEL() const {
+        return (command_id == SET_ATT_LTEL);
+    }
+
+    bool isSetPoutMax() const {
+        return (command_id == SET_POUT_MAX);
+    }
+
+    bool isSetPoutMin() const {
+        return (command_id == SET_POUT_MIN);
     }
 
     void checkByte(uint8_t number);
@@ -107,7 +112,7 @@ private:
     uint8_t command_id;
     const uint8_t LTEL_START_MARK = 0x7e;
     const uint8_t LTEL_END_MARK = 0x7f;
-    const uint8_t MIN_FRAME_HEADER_SIZE = 10;
+    const uint8_t MIN_FRAME_HEADER_SIZE = 9;
 
     const uint8_t QUERY_PARAMETER_LTEL = 0x11;
     const uint8_t QUERY_PARAMETER_SIGMA = 0x12;

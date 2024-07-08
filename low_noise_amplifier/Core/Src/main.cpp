@@ -209,7 +209,7 @@ int main(void) {
 
 
 		if (c.isReady()) {
-			if (c.getModuleId != MODULE_ADDRESS) continue;
+			if (c.getModuleId() != MODULE_ADDRESS) continue;
 			if (c.getModuleFunction() != MODULE_FUNCTION) continue;
 
 
@@ -219,8 +219,7 @@ int main(void) {
 
 
 
-		/*
-		 if (myUart.command == command.getQueryParameterLTEL()) {
+		 /*if (myUart.command == command.getQueryParameterLTEL()) {
 		 //lna = calulate_lna_real_values(adcResultsDMA);
 		 packet_lna_for_ltel_protocol(frame, lna);
 		 myUart.transmitData(frame, LTEL_FRAME_SIZE);
@@ -299,9 +298,8 @@ int main(void) {
 		 DE_Pin, GPIO_PIN_RESET);
 		 lna_print_counter = HAL_GetTick();
 
-		 }
+		 }*/
 
-		 */
 
 		if (HAL_GetTick() - led_counter > LED_STATE_TIMEOUT)
 			led_counter = HAL_GetTick();
