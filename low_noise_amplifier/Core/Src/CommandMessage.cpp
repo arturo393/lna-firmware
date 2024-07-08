@@ -114,3 +114,30 @@ uint16_t CommandMessage::calculateCRC(uint8_t start, uint8_t end) {
 	}
 	return (crc);
 }
+
+bool CommandMessage::composeMessage(std::vector<uint8_t> data) {
+  uint8_t size = data.size();
+  uint16_t crc;
+  if (command_id == 0) return false;
+  message.clear();
+
+  message.push_back(getLTELStartMark());
+
+  message.push_back(module_function);
+  message.push_back(module_id);
+  message.push_back(command_id);
+  message.push_back(0);
+
+  message.push_back(size);
+  if (size > 0) {
+    message.insert(message.end(), data.begin(), data.end());
+  }
+
+  crc = calculateCRC(1, size);
+  message.push_back(static_cast<uint8_t>(crc & 0xFF));
+  message.push_back(static_cast<uint8_t>((crc >> 8) & 0xFF));
+
+  message.push_back(getLTELEndMark());
+
+  return true;
+}

@@ -55,6 +55,10 @@ public:
         return max_message_size;
     }
 
+    std::vector<uint8_t> getMessage() {
+        return message;
+    }
+
     uint8_t getLTELStartMark() const {
         return LTEL_START_MARK;
     }
@@ -95,6 +99,7 @@ public:
 
     void checkByte(uint8_t number);
     std::vector<uint8_t> getData();
+    bool composeMessage(std::vector<uint8_t> data);
 
 private:
     void setVars();

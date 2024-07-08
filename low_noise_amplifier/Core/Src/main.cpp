@@ -196,7 +196,11 @@ int main(void) {
 
 	CommandMessage c = CommandMessage(MODULE_FUNCTION, MODULE_ADDRESS,100);
 	std::vector<uint8_t> data;
-	int size;
+	CommandMessage d = CommandMessage(9, 8);
+	d.setCommandId(0x11);
+	std::vector<uint8_t> v;
+	d.composeMessage(v);
+	uint8_t* vector = d.getMessage().data();
 	while (true) {
 
 
@@ -207,100 +211,95 @@ int main(void) {
 		adcRredings[3] = agc_level.getChannelValue();
 		uartBareMetal.uart1_read(rx_data,100, c);
 
-
+/*
 		if (c.isReady()) {
 			if (c.getModuleId() != MODULE_ADDRESS) continue;
 			if (c.getModuleFunction() != MODULE_FUNCTION) continue;
 
-
-		}
 		/* USER CODE BEGIN 3 */
 	    // 'Receive register not empty' interrupt.
+/*
+			if (c.isQueryParameterLTEL()) {
+				//lna = calulate_lna_real_values(adcResultsDMA);
+			 packet_lna_for_ltel_protocol(frame, lna);
+			 myUart.transmitData(frame, LTEL_FRAME_SIZE);
+			} else if (c.isSetAttLTEL()) {
+				uint8_t attenuation_value = UART1_rxBuffer[6];
+				uint8_t tries = 2;
+				set_attenuation_to_bda4601(attenuation_value, tries);
+				eeprom_1byte_write(LNA_ATT_ADDR, attenuation_value);
+				tx_buffer_size = sprintf((char*) UART1_txBuffer,
+						"Attenuation %u\r\n", attenuation_value);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+				HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+						UART_TRANSMIT_TIMEOUT);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
+			} else if (c.isSetPoutMax()) {
+				eeprom_2byte_write(POUT_ADC_MAX_ADDR, adcResultsDMA[POUT_INDEX]);
+				HAL_Delay(5);
+				eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
+				tx_buffer_size = sprintf((char*) UART1_txBuffer,
+						"Saved adc = %d as Pout 0 [dBm]\n\r",
+						adcResultsDMA[POUT_INDEX]);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+				HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+						UART_TRANSMIT_TIMEOUT);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
+			} else if (c.isSetPoutMin()) {
+				eeprom_2byte_write(POUT_ADC_MIN_ADDR, adcResultsDMA[POUT_INDEX]);
+				HAL_Delay(5);
+				eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
+				tx_buffer_size = sprintf((char*) UART1_txBuffer,
+						"Saved adc = %d as Pout -30 [dBm]\n\r",
+						adcResultsDMA[POUT_INDEX]);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+				HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+						UART_TRANSMIT_TIMEOUT);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
+			} else if (c.isQueryParameterStr()) {
+				isPrintEnable = !isPrintEnable;
+			} else if (c.isQueryADC()) {
+				tx_buffer_size = sprintf((char*) UART1_txBuffer,
+						"Pout %d  \t Gain %u \t Curent %u \t Voltage %u\r\n",
+						adcResultsDMA[POUT_INDEX], adcResultsDMA[GAIN_INDEX],
+						adcResultsDMA[CURRENT_INDEX], adcResultsDMA[VOLTAGE_INDEX]);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+				HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+						UART_TRANSMIT_TIMEOUT);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
+			} else if (c.isQueryParameterSigma()) {
+				//lna = calulate_lna_real_values(adcResultsDMA);
+				sigma_set_parameter_frame(frame, lna);
+				tx_buffer_size = LTEL_FRAME_SIZE;
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+				HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
+						UART_TRANSMIT_TIMEOUT);
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
+			}
 
+			if (isPrintEnable)
+				if (HAL_GetTick() - lna_print_counter > LNA_PRINT_TIMEOUT) {
+					struct Lna lna;
+					lna = calulate_lna_real_values(adcResultsDMA);
+					char *buffer = (char*) UART1_txBuffer;
+					tx_buffer_size =
+							sprintf(buffer,
+									"Pout %d"
+									"[dBm] Att %u[dB] Gain %u[dB] Pin %d[dBm] Curent %d[mA] Voltage %u[V]\r\n",
+									lna.pout, lna.attenuation, lna.gain, lna.pin,
+									lna.current, (uint8_t) lna.voltage);
 
+					HAL_GPIO_WritePin(DE_GPIO_Port,
+							DE_Pin, GPIO_PIN_SET);
+					HAL_UART_Transmit(&huart1, (uint8_t*) buffer, tx_buffer_size,
+							UART_TRANSMIT_TIMEOUT);
+					HAL_GPIO_WritePin(DE_GPIO_Port,
+							DE_Pin, GPIO_PIN_RESET);
+					lna_print_counter = HAL_GetTick();
 
-		 /*if (myUart.command == command.getQueryParameterLTEL()) {
-		 //lna = calulate_lna_real_values(adcResultsDMA);
-		 packet_lna_for_ltel_protocol(frame, lna);
-		 myUart.transmitData(frame, LTEL_FRAME_SIZE);
-		 } else if (myUart.command == command.getSetAttLTEL()) {
-		 uint8_t attenuation_value = UART1_rxBuffer[6];
-		 uint8_t tries = 2;
-		 set_attenuation_to_bda4601(attenuation_value, tries);
-		 eeprom_1byte_write(LNA_ATT_ADDR, attenuation_value);
-		 tx_buffer_size = sprintf((char*) UART1_txBuffer,
-		 "Attenuation %u\r\n", attenuation_value);
-		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
-		 HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
-		 UART_TRANSMIT_TIMEOUT);
-		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-
-		 } else if (myUart.command == command.getSetPoutMax()) {
-		 eeprom_2byte_write(POUT_ADC_MAX_ADDR, adcResultsDMA[POUT_INDEX]);
-		 HAL_Delay(5);
-		 eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
-		 tx_buffer_size = sprintf((char*) UART1_txBuffer,
-		 "Saved adc = %d as Pout 0 [dBm]\n\r",
-		 adcResultsDMA[POUT_INDEX]);
-		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
-		 HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
-		 UART_TRANSMIT_TIMEOUT);
-		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-		 } else if (myUart.command == command.getSetPoutMin()) {
-		 eeprom_2byte_write(POUT_ADC_MIN_ADDR, adcResultsDMA[POUT_INDEX]);
-		 HAL_Delay(5);
-		 eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
-		 tx_buffer_size = sprintf((char*) UART1_txBuffer,
-		 "Saved adc = %d as Pout -30 [dBm]\n\r",
-		 adcResultsDMA[POUT_INDEX]);
-		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
-		 HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
-		 UART_TRANSMIT_TIMEOUT);
-		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-		 } else if (myUart.command == command.getQueryParameterStr()) {
-		 isPrintEnable = !isPrintEnable;
-		 } else if (myUart.command == command.getQueryADC()) {
-		 tx_buffer_size = sprintf((char*) UART1_txBuffer,
-		 "Pout %d  \t Gain %u \t Curent %u \t Voltage %u\r\n",
-		 adcResultsDMA[POUT_INDEX], adcResultsDMA[GAIN_INDEX],
-		 adcResultsDMA[CURRENT_INDEX], adcResultsDMA[VOLTAGE_INDEX]);
-		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
-		 HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
-		 UART_TRANSMIT_TIMEOUT);
-		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-		 } else if (myUart.command == command.getQueryParameterSigma()) {
-		 //lna = calulate_lna_real_values(adcResultsDMA);
-		 sigma_set_parameter_frame(frame, lna);
-		 tx_buffer_size = LTEL_FRAME_SIZE;
-		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
-		 HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
-		 UART_TRANSMIT_TIMEOUT);
-		 HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-		 }
-
-		 if (isPrintEnable)
-		 if (HAL_GetTick() - lna_print_counter > LNA_PRINT_TIMEOUT) {
-		 struct Lna lna;
-		 lna = calulate_lna_real_values(adcResultsDMA);
-		 char *buffer = (char*) UART1_txBuffer;
-		 tx_buffer_size =
-		 sprintf(buffer,
-		 "Pout %d"
-		 "[dBm] Att %u[dB] Gain %u[dB] Pin %d[dBm] Curent %d[mA] Voltage %u[V]\r\n",
-		 lna.pout, lna.attenuation, lna.gain, lna.pin,
-		 lna.current, (uint8_t) lna.voltage);
-
-		 HAL_GPIO_WritePin(DE_GPIO_Port,
-		 DE_Pin, GPIO_PIN_SET);
-		 HAL_UART_Transmit(&huart1, (uint8_t*) buffer, tx_buffer_size,
-		 UART_TRANSMIT_TIMEOUT);
-		 HAL_GPIO_WritePin(DE_GPIO_Port,
-		 DE_Pin, GPIO_PIN_RESET);
-		 lna_print_counter = HAL_GetTick();
-
-		 }*/
-
-
+				}
+		}
+*/
 		if (HAL_GetTick() - led_counter > LED_STATE_TIMEOUT)
 			led_counter = HAL_GetTick();
 		else {
@@ -309,6 +308,7 @@ int main(void) {
 			else
 				gpioHandler.turnOff(led_pin);
 		}
+
 
 		//HAL_IWDG_Refresh(&hiwdg);
 	}   //Fin while
