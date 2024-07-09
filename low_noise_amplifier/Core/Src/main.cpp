@@ -240,7 +240,7 @@ int main(void) {
 				HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
 						UART_TRANSMIT_TIMEOUT);
 				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-			}/* else if (c.isSetPoutMax()) {
+			} else if (c.isSetPoutMax()) {
 				eeprom_2byte_write(POUT_ADC_MAX_ADDR, adcResultsDMA[POUT_INDEX]);
 				HAL_Delay(5);
 				eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);

@@ -52,3 +52,4 @@ void Memory::EEPROM_Write(uint8_t address, uint8_t data) {
 		HAL_I2C_Master_Transmit(hi2c, EEPROM_CHIP_ADDR << 1, buff, 2, 100);
 }
 
+
