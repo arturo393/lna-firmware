@@ -198,8 +198,7 @@ int main(void) {
 	std::vector<uint8_t> data;
 	CommandMessage d = CommandMessage(9, 8);
 	d.setCommandId(0x11);
-	std::vector<uint8_t> v = {1,2,3,4};
-	d.composeMessage(&v);
+	d.composeMessage();
 	uint8_t* vector = d.getMessage().data();
 	while (true) {
 

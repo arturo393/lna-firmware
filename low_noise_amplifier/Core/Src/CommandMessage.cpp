@@ -117,13 +117,14 @@ uint16_t CommandMessage::calculateCRC(uint8_t start, uint8_t end) {
 
 bool CommandMessage::composeMessage(std::vector<uint8_t>* data) {
   uint8_t size;
+  uint16_t crc;
+  if (command_id == 0) return false;
+
   if (data == nullptr) {
     size = 0;
   } else {
     size = data->size();
   }
-  uint16_t crc;
-  if (command_id == 0) return false;
   message.clear();
 
   message.push_back(getLTELStartMark());
@@ -138,7 +139,7 @@ bool CommandMessage::composeMessage(std::vector<uint8_t>* data) {
     message.insert(message.end(), data->begin(), data->end());
   }
 
-  crc = calculateCRC(1, size);
+  crc = calculateCRC(1, 0);
   message.push_back(static_cast<uint8_t>(crc & 0xFF));
   message.push_back(static_cast<uint8_t>((crc >> 8) & 0xFF));
 
