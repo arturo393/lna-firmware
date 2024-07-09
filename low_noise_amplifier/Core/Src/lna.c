@@ -147,9 +147,11 @@ uint8_t get_dbm_pout(uint16_t value, uint8_t fix) {
 	uint8_t pout;
 
 //	do {
-	adc_max = eeprom_2byte_read(POUT_ADC_MAX_ADDR);
+	//adc_max = eeprom_2byte_read(POUT_ADC_MAX_ADDR);
+	adc_max = 4000;
 	HAL_Delay(2);
-	adc_min = eeprom_2byte_read(POUT_ADC_MIN_ADDR);
+	//adc_min = eeprom_2byte_read(POUT_ADC_MIN_ADDR);
+	adc_min = 0;
 //	} while (adc_max == adc_min);
 	pout = arduino_map(value, adc_min, adc_max, POUT_DBM_MIN, POUT_DBM_MAX);
 	return (pout + fix);
@@ -189,7 +191,8 @@ struct Lna calulate_lna_real_values(volatile uint16_t *adc) {
 	lna.current = get_current(adc[CURRENT_INDEX], 0);
 	lna.gain = get_db_gain(adc[GAIN_INDEX], gain_fix);
 	lna.voltage = get_voltage(adc[VOLTAGE_INDEX], 0) / 10;
-	lna.attenuation = eeprom_1byte_read(LNA_ATT_ADDR);
+	lna.attenuation = 15;
+	//lna.attenuation = eeprom_1byte_read(LNA_ATT_ADDR);
 	lna.pin = lna.pout - lna.gain + lna.attenuation;
 	return (lna);
 }

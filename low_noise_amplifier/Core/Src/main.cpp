@@ -194,12 +194,8 @@ int main(void) {
 //
 	uint16_t adcRredings[100];
 
-	CommandMessage c = CommandMessage(MODULE_FUNCTION, MODULE_ADDRESS,100);
+	CommandMessage c = CommandMessage(100);
 	std::vector<uint8_t> data;
-	CommandMessage d = CommandMessage(9, 8);
-	d.setCommandId(0x11);
-	d.composeMessage();
-	uint8_t* vector = d.getMessage().data();
 	while (true) {
 
 
@@ -208,32 +204,43 @@ int main(void) {
 		adcRredings[1] = current_consumption.getChannelValue();
 		adcRredings[2] = voltage_input.getChannelValue();
 		adcRredings[3] = agc_level.getChannelValue();
-		uartBareMetal.uart1_read(rx_data,100, c);
+		uartBareMetal.readCommand(c);
 
-/*
 		if (c.isReady()) {
 			if (c.getModuleId() != MODULE_ADDRESS) continue;
 			if (c.getModuleFunction() != MODULE_FUNCTION) continue;
 
-		/* USER CODE BEGIN 3 */
+		// USER CODE BEGIN 3
 	    // 'Receive register not empty' interrupt.
-/*
+
 			if (c.isQueryParameterLTEL()) {
-				//lna = calulate_lna_real_values(adcResultsDMA);
-			 packet_lna_for_ltel_protocol(frame, lna);
-			 myUart.transmitData(frame, LTEL_FRAME_SIZE);
-			} else if (c.isSetAttLTEL()) {
-				uint8_t attenuation_value = UART1_rxBuffer[6];
-				uint8_t tries = 2;
-				set_attenuation_to_bda4601(attenuation_value, tries);
-				eeprom_1byte_write(LNA_ATT_ADDR, attenuation_value);
-				tx_buffer_size = sprintf((char*) UART1_txBuffer,
-						"Attenuation %u\r\n", attenuation_value);
+				//lna = calulate_lna_real_values(adcRredings);
+				//CommandMessage tr = CommandMessage(MODULE_FUNCTION, MODULE_ID);
+				lna.attenuation = 0;
+				lna.gain = 0;
+				lna.pout = 0;
+				lna.voltage = 0;
+				std::vector<uint8_t> data;
+				data.push_back(lna.attenuation);
+				data.push_back(lna.gain);
+				data.push_back(lna.pout);
+				data.push_back(lna.voltage);
+				c.composeMessage(&data);
+				uartBareMetal.transmitCommand(c);
+			}/* else if (c.isSetAttLTEL()) {
+				uint8_t attenuation_value = c.getData()[0];
+				rfAttenuator.attenuate(attenuation_value);
+				eeeprom.setValue(attenuation_flag, attenuation_value);
+				//eeprom_1byte_write(LNA_ATT_ADDR, attenuation_value);
+				//std::string to_send = "Attenuation " + std::to_string(attenuation_value);
+				char text[50];
+				snprintf(text, sizeof(text), "%u\r\n", attenuation_value);
+				uartBareMetal.transmitMessage(text);
 				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
 				HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
 						UART_TRANSMIT_TIMEOUT);
 				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-			} else if (c.isSetPoutMax()) {
+			}/* else if (c.isSetPoutMax()) {
 				eeprom_2byte_write(POUT_ADC_MAX_ADDR, adcResultsDMA[POUT_INDEX]);
 				HAL_Delay(5);
 				eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
@@ -296,16 +303,17 @@ int main(void) {
 							DE_Pin, GPIO_PIN_RESET);
 					lna_print_counter = HAL_GetTick();
 
-				}
+				}*/
+			c.reset();
 		}
-*/
+
 		if (HAL_GetTick() - led_counter > LED_STATE_TIMEOUT)
 			led_counter = HAL_GetTick();
 		else {
 			if (HAL_GetTick() - led_counter > LED_ON_TIMEOUT)
-				gpioHandler.turnOn(led_pin);
-			else
 				gpioHandler.turnOff(led_pin);
+			else
+				gpioHandler.turnOn(led_pin);
 		}
 
 

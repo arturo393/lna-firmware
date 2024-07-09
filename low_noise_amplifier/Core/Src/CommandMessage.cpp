@@ -16,6 +16,12 @@ CommandMessage::CommandMessage(uint8_t _module_function, uint8_t _module_id, uin
 CommandMessage::CommandMessage(uint8_t _module_function, uint8_t _module_id)
     : CommandMessage(_module_function, _module_id, 255) {}
 
+CommandMessage::CommandMessage(uint8_t max_size) : max_message_size(max_size) {
+  reset();
+}
+
+CommandMessage::CommandMessage() : CommandMessage(255){}
+
 CommandMessage::~CommandMessage() {}
 
 void CommandMessage::setVars() {

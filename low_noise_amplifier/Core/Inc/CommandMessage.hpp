@@ -15,6 +15,8 @@ class CommandMessage {
 public:
     CommandMessage(uint8_t _module_function, uint8_t _module_id, uint8_t max_size);
     CommandMessage(uint8_t _module_function, uint8_t _module_id); // Constructor que delega
+    CommandMessage(uint8_t max_size);
+    CommandMessage();
     virtual ~CommandMessage();
 
     // Getters y Setters
@@ -101,11 +103,11 @@ public:
     std::vector<uint8_t> getData();
     bool composeMessage(std::vector<uint8_t>* data);
     bool composeMessage();
+    void reset(bool init);
+    void reset();
 
 private:
     void setVars();
-    void reset(bool init);
-    void reset();
     bool prepareTxData(const char *message);
     void handleRxData(uint8_t data);
     bool validateChecksum();
