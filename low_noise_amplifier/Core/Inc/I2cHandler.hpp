@@ -9,20 +9,17 @@
 #define INC_I2cHandler_HPP_
 
 #include "main.h"
-#include "CommandMessage.hpp"
 
 #define WRITE 0
 #define READ 1
 
 class I2cHandler {
-public:
-	char byteReceive(char, uint8_t);
-	void byteTransmit(char, char*, uint8_t);
-	void i2c1_init();
-protected:
-	virtual ~I2cHandler()=0;
-	void startComunication(char, uint8_t, uint8_t); // solo del baremetal
-	void scanner(uint8_t *addr); // solo del baremetal
+	public:
+		virtual uint8_t byteReceive(char address, uint8_t bytes_to_read)=0;
+		virtual void byteTransmit(char address, char* buffer, uint8_t bytes_to_write)=0;
+		virtual void i2c1_init()=0;
+	protected:
+		virtual ~I2cHandler()=0;
 };
 
 inline I2cHandler::~I2cHandler() {

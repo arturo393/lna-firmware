@@ -30,7 +30,7 @@ T Memory::EEPROM_byte_Read(uint8_t address) {
             HAL_Delay(5);
             data = data << 8;
         }
-        data |= EEPROM_Read(address + i);
+         data |= EEPROM_Read(address + i);
     }
 
     return (data);

@@ -11,6 +11,7 @@
 #include <main.h>
 #include <vector>
 #include <string>
+#include "I2cHandler.hpp"
 
 
 
@@ -23,7 +24,7 @@ public:
 		uint8_t size;
 	}MemoryLocation;
 
-	Memory(I2C_HandleTypeDef* _hi2c);
+	Memory(I2cHandler* _hi2c);
 	virtual ~Memory();
 	uint8_t createKey(uint8_t address, uint8_t size);
 
@@ -34,7 +35,7 @@ public:
 	void setValue(uint8_t key, T value);
 
 private:
-	I2C_HandleTypeDef* hi2c;
+	I2cHandler* hi2c;
 	uint8_t EEPROM_CHIP_ADDR;
 	uint8_t EEPROM_PAGE_SIZE;
 	uint8_t EEPrOM_PAGE_NUM = 32;

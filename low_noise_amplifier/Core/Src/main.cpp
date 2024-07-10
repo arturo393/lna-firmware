@@ -34,6 +34,7 @@
 #include <Memory.hpp>
 #include <ProtocolMessage.hpp>
 #include <UartHandlerBareMetal.hpp>
+#include <I2cBareMetal.hpp>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,7 +57,7 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 
-I2C_HandleTypeDef hi2c1;
+//I2C_HandleTypeDef hi2c1;
 
 IWDG_HandleTypeDef hiwdg;
 
@@ -78,7 +79,7 @@ UartHandlerBareMetal uartBareMetal = UartHandlerBareMetal();
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_I2C1_Init(void);
+//static void MX_I2C1_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_IWDG_Init(void);
 /* USER CODE BEGIN PFP */
@@ -88,7 +89,6 @@ static void MX_IWDG_Init(void);
 /* USER CODE BEGIN 0 */
 
 struct Lna lna;
-char rx_data[100];
 /* USER CODE END 0 */
 
 /**
@@ -117,7 +117,7 @@ int main(void) {
 	MX_GPIO_Init();
 	MX_ADC1_Init();
 //	MX_USART1_UART_Init();
-	MX_I2C1_Init();
+//	MX_I2C1_Init();
 //	MX_IWDG_Init();
 	/* memory ok
 	 * attenuator ok
@@ -130,7 +130,9 @@ int main(void) {
 	uartBareMetal.init(USART1, DE_GPIO_Port, DE_Pin);
 	uartBareMetal.transmitMessage("LNA init");
 
-	Memory eeeprom = Memory(&hi2c1);
+
+	I2cBareMetal i2c = I2cBareMetal();
+	Memory eeeprom = Memory(&i2c);
 	uint8_t lna_att_key = eeeprom.createKey(LNA_ATT_ADDR, sizeof(uint8_t));
 	uint8_t pout_adc_max_key = eeeprom.createKey(POUT_ADC_MAX_ADDR,
 			sizeof(uint16_t));
@@ -173,6 +175,7 @@ int main(void) {
 	}
 
 
+	UartHandlerBareMetal myUart = UartHandlerBareMetal();
 //	myUart.transmitMessage("LNA init\n\r");
 //	myUart.wait_for_it_byte();
 
@@ -196,21 +199,27 @@ int main(void) {
 
 	CommandMessage c = CommandMessage(100);
 	std::vector<uint8_t> data;
+	CommandMessage d = CommandMessage(9,8,20);
+	d.setCommandId(11);
+	d.composeMessage();
+	uint8_t* v = d.getMessage().data();
 	while (true) {
 
 
-		/* USER CODE END WHILE */
+		// USER CODE END WHILE
 		adcRredings[0] = rf_power_out.getChannelValue();
 		adcRredings[1] = current_consumption.getChannelValue();
 		adcRredings[2] = voltage_input.getChannelValue();
 		adcRredings[3] = agc_level.getChannelValue();
 		uartBareMetal.readCommand(c);
 
+
+
 		if (c.isReady()) {
 			if (c.getModuleId() != MODULE_ADDRESS) continue;
 			if (c.getModuleFunction() != MODULE_FUNCTION) continue;
 
-		// USER CODE BEGIN 3
+		/* USER CODE BEGIN 3 */
 	    // 'Receive register not empty' interrupt.
 
 			if (c.isQueryParameterLTEL()) {
@@ -227,7 +236,7 @@ int main(void) {
 				data.push_back(lna.voltage);
 				c.composeMessage(&data);
 				uartBareMetal.transmitCommand(c);
-			}/* else if (c.isSetAttLTEL()) {
+			} else if (c.isSetAttLTEL()) {
 				uint8_t attenuation_value = c.getData()[0];
 				rfAttenuator.attenuate(attenuation_value);
 				eeeprom.setValue(attenuation_flag, attenuation_value);
@@ -236,11 +245,11 @@ int main(void) {
 				char text[50];
 				snprintf(text, sizeof(text), "%u\r\n", attenuation_value);
 				uartBareMetal.transmitMessage(text);
-				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
+				/*HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_SET);
 				HAL_UART_Transmit(&huart1, UART1_txBuffer, tx_buffer_size,
 						UART_TRANSMIT_TIMEOUT);
-				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);
-			} else if (c.isSetPoutMax()) {
+				HAL_GPIO_WritePin(DE_GPIO_Port, DE_Pin, GPIO_PIN_RESET);*/
+			}/* else if (c.isSetPoutMax()) {
 				eeprom_2byte_write(POUT_ADC_MAX_ADDR, adcResultsDMA[POUT_INDEX]);
 				HAL_Delay(5);
 				eeprom_1byte_write(POUT_ISCALIBRATED_ADDR, POUT_ISCALIBRATED);
@@ -303,8 +312,8 @@ int main(void) {
 							DE_Pin, GPIO_PIN_RESET);
 					lna_print_counter = HAL_GetTick();
 
-				}*/
-			c.reset();
+				}
+			c.reset();*/
 		}
 
 		if (HAL_GetTick() - led_counter > LED_STATE_TIMEOUT)
@@ -449,45 +458,6 @@ static void MX_ADC1_Init(void) {
  * @param None
  * @retval None
  */
-static void MX_I2C1_Init(void) {
-
-	/* USER CODE BEGIN I2C1_Init 0 */
-
-	/* USER CODE END I2C1_Init 0 */
-
-	/* USER CODE BEGIN I2C1_Init 1 */
-
-	/* USER CODE END I2C1_Init 1 */
-	hi2c1.Instance = I2C1;
-	hi2c1.Init.Timing = 0x00602173;
-	hi2c1.Init.OwnAddress1 = 0;
-	hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-	hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-	hi2c1.Init.OwnAddress2 = 0;
-	hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
-	hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-	hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-	if (HAL_I2C_Init(&hi2c1) != HAL_OK) {
-		Error_Handler();
-	}
-
-	/** Configure Analogue filter
-	 */
-	if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE)
-			!= HAL_OK) {
-		Error_Handler();
-	}
-
-	/** Configure Digital filter
-	 */
-	if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK) {
-		Error_Handler();
-	}
-	/* USER CODE BEGIN I2C1_Init 2 */
-
-	/* USER CODE END I2C1_Init 2 */
-
-}
 
 /**
  * @brief IWDG Initialization Function

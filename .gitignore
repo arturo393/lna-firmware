@@ -71,3 +71,8 @@ ctrlp.root
 **/Debug/
 .project
 .metadata/*
+
+*.cmake
+*.bin
+**/build/**
+**/Drivers/**
